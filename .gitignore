@@ -1,0 +1,6 @@
+recite.db
+*.pyc
+__pycache__/
+.env
+.venv
+venv/

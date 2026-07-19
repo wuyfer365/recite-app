@@ -94,7 +94,7 @@ body { padding-bottom: 3.5rem; }
 <div class="page" id="pageWords"><div id="wordList"></div></div>
 <div class="page" id="pageStats"><div id="statsContent"></div></div>
 <div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button></div>
-<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">格式：word,meaning,phonetic,example,example_cn</p><textarea id="importText" rows="8" placeholder="abandon, 放弃,.They.."></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadDemoWords()" class="outline">📥 CET-4 核心100词</button><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><button onclick="exportWords()" class="outline">📤 导出备份</button></div>
+<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">格式：word,meaning,phonetic,example,example_cn</p><textarea id="importText" rows="8" placeholder="abandon, 放弃,.They.."></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadDemoWords()" class="outline">📥 CET-4 核心100词</button><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><button onclick="loadPrimary()" class="outline">🏫 小学词库</button><button onclick="exportWords()" class="outline">📤 导出备份</button></div>
 <div class="page" id="pageAdmin"><h3>👑 管理面板</h3><div id="adminContent"></div></div>
 <!-- 底部导航（全局固定，不在任何.page内部） -->
 <div class="bottom-nav">
@@ -519,6 +519,24 @@ async function loadCET4() {
         }
         await saveWords(list);
         showModal(`加载 ${list.length} 个 CET-4 单词`);
+        await loadWords(true); refreshStats();
+    } catch(e) { showModal('加载失败: '+e.message); }
+}
+
+async function loadPrimary() {
+    try {
+        const resp = await fetch('primary.csv');
+        const text = await resp.text();
+        const lines = text.split('\n').filter(l=>l.trim());
+        const list = [];
+        for (const line of lines) {
+            if (line.startsWith('word,meaning')) continue;
+            const p = line.split(',').map(s=>s.trim());
+            if (p.length<2 || !p[0]) continue;
+            list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
+        }
+        await saveWords(list);
+        showModal('加载 ' + list.length + ' 个小学单词');
         await loadWords(true); refreshStats();
     } catch(e) { showModal('加载失败: '+e.message); }
 }

@@ -537,14 +537,12 @@ async function clearMyData() {
 }
 // ============ 导入 ============
 // 切换到指定词库（首页下拉+刷新）
-function switchSource(src) {
+async function switchSource(src) {
     state.currentSource = src;
     document.getElementById('sourceFilter').value = src;
     localStorage.setItem('recite_source', src);
     state._wordsLoaded = false;
-    // 先刷新统计数据（全局，无论当前页面）
-    refreshStats();
-    // 再按当前页刷新完整内容
+    await refreshStats();
     var active = document.querySelector('.page.active');
     if (active && active.id !== 'pageHome') showPage(active.id);
 }

@@ -107,7 +107,7 @@ body { padding-bottom: 3.5rem; }
 <div class="page" id="pageWords"><div id="wordList"></div></div>
 <div class="page" id="pageStats"><div id="statsContent"></div></div>
 <div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button><button onclick="resetCurve()" class="outline" style="margin-left:0.5rem;">恢复默认</button></div>
-<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">每行一个单词，格式：英文，中文释义（音标、例句可选），清空后粘贴你自己的词库</p><textarea id="importText" rows="6" placeholder="apple, 苹果, /ˈæp.əl/&#10;book, 书本, /bʊk/&#10;cat, 猫, /kæt/, The cat is sleeping., 猫在睡觉。"></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><button onclick="loadPrimary()" class="outline">🏫 小学词库</button><button onclick="exportWords()" class="outline">📤 导出备份</button></div>
+<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">每行一个单词，格式：英文，中文释义（音标、例句可选），清空后粘贴你自己的词库</p><div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;"><span style="font-size:0.85rem;color:#888;">词库标签</span><select id="importSource" style="display:inline;width:auto;margin-bottom:0;font-size:0.85rem;"><option value="import">自定义</option><option value="cet4">CET-4</option><option value="primary">小学</option></select></div><textarea id="importText" rows="6" placeholder="apple, 苹果, /ˈæp.əl/&#10;book, 书本, /bʊk/&#10;cat, 猫, /kæt/, The cat is sleeping., 猫在睡觉。"></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><button onclick="loadPrimary()" class="outline">🏫 小学词库</button><button onclick="exportWords()" class="outline">📤 导出备份</button></div>
 <div class="page" id="pageAdmin"><h3>👑 管理面板</h3><div id="adminContent"></div></div>
 <!-- 底部导航（全局固定，不在任何.page内部） -->
 <div class="bottom-nav">
@@ -206,7 +206,7 @@ function calcNextTime(stage, result) {
 }
 
 // ============ 状态 ============
-let state = {mode:'mix', dailyLimit:100, words:[], todayDate:'', todayStudied:0, todayReviewed:0, _wordsLoaded:false};
+let state = {mode:'mix', dailyLimit:100, words:[], todayDate:'', todayStudied:0, todayReviewed:0, _wordsLoaded:false, currentSource:''};
 
 function loadState() {
     try {
@@ -221,6 +221,20 @@ function saveState() {
         todayDate:state.todayDate, todayStudied:state.todayStudied,
         todayReviewed:state.todayReviewed, dailyLimit:state.dailyLimit, mode:state.mode
     }));
+}
+
+// 按来源过滤单词
+function getFilteredWords() {
+    if (!state.currentSource) return state.words;
+    return state.words.filter(w => w.source === state.currentSource);
+}
+
+function onSourceChange() {
+    state.currentSource = document.getElementById('sourceFilter').value;
+    localStorage.setItem('recite_source', state.currentSource);
+    // 刷新当前页面
+    var active = document.querySelector('.page.active');
+    if (active) showPage(active.id);
 }
 
 function checkDate() {
@@ -269,10 +283,11 @@ async function refreshStats() {
         if (!hasCache) document.getElementById('loadingSpinner').classList.add('active');
     }
     checkDate(); await loadWords();
+    var words = getFilteredWords();
     const now = Date.now();
-    let review = state.words.filter(w => w.status==='learning' && w.next_time && w.next_time <= now);
-    let newW = state.words.filter(w => w.status==='new' || !w.status);
-    let mastered = state.words.filter(w => w.status==='mastered');
+    let review = words.filter(w => w.status==='learning' && w.next_time && w.next_time <= now);
+    let newW = words.filter(w => w.status==='new' || !w.status);
+    let mastered = words.filter(w => w.status==='mastered');
     let remaining = Math.max(0, state.dailyLimit - state.todayStudied);
     document.getElementById('statReview').textContent = review.length;
     document.getElementById('statNew').textContent = Math.min(remaining, newW.length);
@@ -299,9 +314,10 @@ function showPage(id) {
 // 更新统计数字（不刷新页面）
 function updateStats() {
     var now = Date.now();
-    var review = state.words.filter(function(w) { return w.status==='learning' && w.next_time && w.next_time <= now; }).length;
-    var newW = state.words.filter(function(w) { return w.status==='new' || !w.status; }).length;
-    var mastered = state.words.filter(function(w) { return w.status==='mastered'; }).length;
+    var words = getFilteredWords();
+    var review = words.filter(function(w) { return w.status==='learning' && w.next_time && w.next_time <= now; }).length;
+    var newW = words.filter(function(w) { return w.status==='new' || !w.status; }).length;
+    var mastered = words.filter(function(w) { return w.status==='mastered'; }).length;
     var remaining = Math.max(0, state.dailyLimit - state.todayStudied);
     document.getElementById('statReview').textContent = review;
     document.getElementById('statNew').textContent = Math.min(remaining, newW);
@@ -421,31 +437,32 @@ async function rateWord(result) {
 // ============ 词库 ============
 async function renderWordList() {
     await loadWords();
-    if (state.words.length===0) {
+    var words = getFilteredWords();
+    if (words.length===0) {
         document.getElementById('wordList').innerHTML = '<div class="empty">暂无单词</div>';
         return;
     }
     // 分批渲染，前200条立即展示，剩下的懒加载
     var batchSize = 200;
-    var html = state.words.slice(0, batchSize).map(w =>
+    var html = words.slice(0, batchSize).map(w =>
         '<div class="word-item"><div><span class="en">'+w.word+'</span> <span class="zh">'+(w.meaning||'')+'</span></div>'+
         '<div><span class="stage">'+(STAGES[w.stage||0]?.label||'新词')+'</span>'+
         '<button class="outline" style="padding:0.2rem 0.5rem;margin-left:0.3rem;" onclick="delW(\''+w.word+'\')">×</button></div></div>'
     ).join('');
     document.getElementById('wordList').innerHTML = html;
     // 剩余单词分批追加
-    if (state.words.length > batchSize) {
+    if (words.length > batchSize) {
         var idx = batchSize;
         function appendBatch() {
-            var end = Math.min(idx + batchSize, state.words.length);
-            var more = state.words.slice(idx, end).map(w =>
+            var end = Math.min(idx + batchSize, words.length);
+            var more = words.slice(idx, end).map(w =>
                 '<div class="word-item"><div><span class="en">'+w.word+'</span> <span class="zh">'+(w.meaning||'')+'</span></div>'+
                 '<div><span class="stage">'+(STAGES[w.stage||0]?.label||'新词')+'</span>'+
                 '<button class="outline" style="padding:0.2rem 0.5rem;margin-left:0.3rem;" onclick="delW(\''+w.word+'\')">×</button></div></div>'
             ).join('');
             document.getElementById('wordList').insertAdjacentHTML('beforeend', more);
             idx = end;
-            if (idx < state.words.length) requestAnimationFrame(appendBatch);
+            if (idx < words.length) requestAnimationFrame(appendBatch);
         }
         requestAnimationFrame(appendBatch);
     }
@@ -461,11 +478,12 @@ async function delW(word) {
 // ============ 统计 ============
 async function renderStatsPage() {
     await loadWords();
+    var words = getFilteredWords();
     document.getElementById('statsContent').innerHTML = `
     <div class="detail-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin:1rem 0;">
-        <div class="detail-item" style="background:white;border-radius:8px;padding:0.6rem 1rem;display:flex;justify-content:space-between;"><span>总词数</span><span class="val">${state.words.length}</span></div>
-        <div class="detail-item" style="background:white;border-radius:8px;padding:0.6rem 1rem;display:flex;justify-content:space-between;"><span>学习中</span><span class="val">${state.words.filter(w=>w.status==='learning').length}</span></div>
-        <div class="detail-item" style="background:white;border-radius:8px;padding:0.6rem 1rem;display:flex;justify-content:space-between;"><span>已掌握</span><span class="val">${state.words.filter(w=>w.status==='mastered').length}</span></div>
+        <div class="detail-item" style="background:white;border-radius:8px;padding:0.6rem 1rem;display:flex;justify-content:space-between;"><span>总词数</span><span class="val">${words.length}</span></div>
+        <div class="detail-item" style="background:white;border-radius:8px;padding:0.6rem 1rem;display:flex;justify-content:space-between;"><span>学习中</span><span class="val">${words.filter(w=>w.status==='learning').length}</span></div>
+        <div class="detail-item" style="background:white;border-radius:8px;padding:0.6rem 1rem;display:flex;justify-content:space-between;"><span>已掌握</span><span class="val">${words.filter(w=>w.status==='mastered').length}</span></div>
         <div class="detail-item" style="background:white;border-radius:8px;padding:0.6rem 1rem;display:flex;justify-content:space-between;"><span>今日学</span><span class="val">${state.todayStudied}</span></div>
     </div>`;
 }
@@ -514,25 +532,37 @@ async function clearMyData() {
     });
 }
 // ============ 导入 ============
+// 切换到指定词库（首页下拉+刷新）
+function switchSource(src) {
+    state.currentSource = src;
+    document.getElementById('sourceFilter').value = src;
+    localStorage.setItem('recite_source', src);
+    refreshStats();
+}
+
 async function importWords() {
     const text = document.getElementById('importText').value.trim();
     if (!text) return showModal('请粘贴词库');
+    const src = document.getElementById('importSource').value;
     const lines = text.split('\n').filter(l=>l.trim());
     const list = [];
     for (const line of lines) {
         const p = line.split(',').map(s=>s.trim());
         if (p.length<2 || !p[0]) continue;
-        list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
+        list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new', source: src});
     }
     if (list.length===0) return showModal('未解析到有效单词');
     const r = await saveWords(list);
     showModal(`导入 ${list.length} 个单词`);
-    await loadWords(true); refreshStats();
+    await loadWords(true);
+    switchSource(src);
 }
 
 async function exportWords() {
     await loadWords();
-    const txt = state.words.map(w => `${w.word},${w.meaning||''},${w.phonetic||''},${w.example||''},${w.example_cn||''}`).join('\n');
+    var words = getFilteredWords();
+    if (words.length===0) return showModal('当前词库为空');
+    const txt = words.map(w => `${w.word},${w.meaning||''},${w.phonetic||''},${w.example||''},${w.example_cn||''}`).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain;charset=utf-8'}));
     a.download = `words_${new Date().toISOString().slice(0,10)}.csv`; a.click();
@@ -551,9 +581,11 @@ async function loadCET4() {
             if (p.length<2 || !p[0]) continue;
             list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
         }
-        await saveWords(list);
-        showModal(`加载 ${list.length} 个 CET-4 单词`);
-        await loadWords(true); refreshStats();
+        var list2 = list.map(function(w){ return Object.assign(w, {source:'cet4'}); });
+        await saveWords(list2);
+        showModal(`加载 ${list2.length} 个 CET-4 单词`);
+        await loadWords(true);
+        switchSource('cet4');
     } catch(e) { showModal('加载失败: '+e.message); }
 }
 
@@ -569,9 +601,11 @@ async function loadPrimary() {
             if (p.length<2 || !p[0]) continue;
             list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
         }
-        await saveWords(list);
-        showModal('加载 ' + list.length + ' 个小学单词');
-        await loadWords(true); refreshStats();
+        var list2 = list.map(function(w){ return Object.assign(w, {source:'primary'}); });
+        await saveWords(list2);
+        showModal('加载 ' + list2.length + ' 个小学单词');
+        await loadWords(true);
+        switchSource('primary');
     } catch(e) { showModal('加载失败: '+e.message); }
 }
 
@@ -793,6 +827,10 @@ window.__test.run = async function() {
     window.onerror=function(msg,url,line){ caughtErrors.push(msg+'(行'+line+')'); return true; };
     function check(desc, cond) { if(cond) { ok++; console.log('  ✅ '+desc); } else { fail++; console.log('  ❌ '+desc); errs.push(desc); } }
     function sleep(ms) { return new Promise(function(r){setTimeout(r,ms);}); }
+    // 临时切到"全部"词库，避免筛选影响测试
+    var _savedSrc = state.currentSource;
+    state.currentSource = '';
+    if (document.getElementById('sourceFilter')) document.getElementById('sourceFilter').value = '';
 
     console.log('%c===== 单词记忆 App 自测开始 =====','font-size:1.2rem;font-weight:bold');
     var start = Date.now();
@@ -972,6 +1010,9 @@ window.__test.run = async function() {
     await deleteWord('test_auto2');
     await deleteWord('testword');
     await deleteWord('testword2');
+    // 恢复词库筛选
+    state.currentSource = _savedSrc;
+    if (document.getElementById('sourceFilter')) document.getElementById('sourceFilter').value = _savedSrc;
 
     // ===== 报告 =====
     window.onerror = _origOnError;
@@ -996,6 +1037,10 @@ if (phone) {
     document.getElementById('mainApp').style.display='block';
     document.getElementById('userPhone').textContent = phone;
     loadState();
+    // 恢复词库筛选
+    var savedSource = localStorage.getItem('recite_source') || '';
+    state.currentSource = savedSource;
+    document.getElementById('sourceFilter').value = savedSource;
     document.getElementById('dailyLimit').addEventListener('input', e => { state.dailyLimit=parseInt(e.target.value)||100; updateStats(); if (document.getElementById('pageHome').classList.contains('active')) refreshStats(); });
     document.getElementById('dailyLimit').addEventListener('change', e => { state.dailyLimit=parseInt(e.target.value)||100; saveState(); refreshStats(); });
     document.getElementById('modeSelect').addEventListener('change', e => { state.mode=e.target.value; saveState(); refreshStats(); });

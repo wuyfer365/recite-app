@@ -54,6 +54,12 @@ body { padding-bottom: 3.5rem; }
 .loading-spinner .dot:nth-child(3) { animation-delay:0s; }
 @keyframes bounce { 0%,80%,100%{transform:scale(0)} 40%{transform:scale(1)} }
 .review-badge { display:inline-block; background:#f39c12; color:white; font-size:0.7rem; padding:0.15rem 0.6rem; border-radius:10px; margin-bottom:0.5rem; }
+/* 全局弹窗按钮（统一尺寸/圆角/字号，确定和取消视觉一致） */
+.modal-btn { display:inline-block; min-width:80px; border:none; border-radius:24px; padding:0.6rem 1.5rem; font-size:0.9rem; cursor:pointer; font-family:inherit; transition:opacity 0.15s; }
+.modal-btn:active { opacity:0.7; }
+.modal-btn-primary { background:#0066cc; color:white; box-shadow:0 2px 8px rgba(0,102,204,0.3); }
+.modal-btn-secondary { background:#f0f0f0; color:#333; border:1px solid #ddd; }
+#modalBtns { display:flex; gap:0.6rem; justify-content:center; }
 </style>
 </head>
 <body>
@@ -72,7 +78,14 @@ body { padding-bottom: 3.5rem; }
 <div id="mainApp" style="display:none;">
 <div class="header">
     <h1>📚 单词记忆 <span id="userPhone" style="font-size:0.7rem;color:#888;"></span></h1>
-    <div style="display:flex;gap:0.3rem;align-items:center;">
+    <div style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:0.75rem;color:#888;">词库</span>
+        <select id="sourceFilter" style="display:inline;width:auto;margin-bottom:0;font-size:0.8rem;height:44px;" onchange="onSourceChange()">
+            <option value="">全部</option>
+            <option value="cet4">CET-4</option>
+            <option value="primary">小学</option>
+            <option value="import">自定义</option>
+        </select>
         <span style="font-size:0.75rem;color:#888;">每日</span>
         <input type="number" id="dailyLimit" value="100" min="10" max="999" style="width:50px;padding:0.2rem;text-align:center;margin-bottom:0;height:44px;">
         <select id="modeSelect" style="display:inline;width:auto;margin-bottom:0;font-size:0.8rem;height:44px;">
@@ -93,8 +106,8 @@ body { padding-bottom: 3.5rem; }
 </div>
 <div class="page" id="pageWords"><div id="wordList"></div></div>
 <div class="page" id="pageStats"><div id="statsContent"></div></div>
-<div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button></div>
-<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">格式：word,meaning,phonetic,example,example_cn</p><textarea id="importText" rows="8" placeholder="abandon, 放弃,.They.."></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadDemoWords()" class="outline">📥 CET-4 核心100词</button><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><button onclick="loadPrimary()" class="outline">🏫 小学词库</button><button onclick="exportWords()" class="outline">📤 导出备份</button></div>
+<div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button><button onclick="resetCurve()" class="outline" style="margin-left:0.5rem;">恢复默认</button></div>
+<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">每行一个单词，格式：英文，中文释义（音标、例句可选），清空后粘贴你自己的词库</p><textarea id="importText" rows="6" placeholder="apple, 苹果, /ˈæp.əl/&#10;book, 书本, /bʊk/&#10;cat, 猫, /kæt/, The cat is sleeping., 猫在睡觉。"></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><button onclick="loadPrimary()" class="outline">🏫 小学词库</button><button onclick="exportWords()" class="outline">📤 导出备份</button></div>
 <div class="page" id="pageAdmin"><h3>👑 管理面板</h3><div id="adminContent"></div></div>
 <!-- 底部导航（全局固定，不在任何.page内部） -->
 <div class="bottom-nav">
@@ -169,9 +182,9 @@ const STAGES = [
     {stage:0, label:'T0', interval:0},
     {stage:1, label:'T1', interval:1/24},
     {stage:2, label:'T2', interval:1},
-    {stage:3, label:'T3', interval:7},
-    {stage:4, label:'T4', interval:30},
-    {stage:5, label:'T5', interval:customInt?customInt[4]:365},
+    {stage:3, label:'T3', interval:3},
+    {stage:4, label:'T4', interval:7},
+    {stage:5, label:'T5', interval:customInt?customInt[4]:30},
 ];
 if (customInt) {
     STAGES[1].interval = customInt[0]/24;
@@ -386,9 +399,23 @@ async function rateWord(result) {
     updateStats();
     flipped=false;
     currentIndex++;
-    if (isReview && currentIndex >= currentWords.length) showModal('🎉 复习完成！即将进入新词');
-    if (currentIndex >= currentWords.length) { await refreshStats(); }
-    else { showCard(); }
+    if (isReview && currentIndex >= currentWords.length) {
+        // 复习完成：先刷新数据判断有无新词
+        await refreshStats();
+        var hasNew = (currentWords.length > 0 && !isReview);
+        if (hasNew) {
+            showModal('🎉 复习完成！即将进入新词', function(){
+                // 直接切到新词卡片
+                showPage('pageHome');
+            });
+        } else {
+            showModal('🎉 今日复习完成！');
+        }
+    } else if (currentIndex >= currentWords.length) {
+        await refreshStats();
+    } else {
+        showCard();
+    }
 }
 
 // ============ 词库 ============
@@ -425,8 +452,10 @@ async function renderWordList() {
 }
 
 async function delW(word) {
-    await deleteWord(word);
-    renderWordList();
+    showConfirm('确定删除「'+word+'」？', async function(){
+        await deleteWord(word);
+        renderWordList();
+    });
 }
 
 // ============ 统计 ============
@@ -459,9 +488,31 @@ async function renderAdmin() {
             html += '</div>';
         }
         html += '</div>';
+        html += '<div style="margin-top:1rem;padding-top:1rem;border-top:2px solid #eee;">';
+        html += '<button onclick="clearMyData()" class="outline" style="--pico-background-color:#e74c3c;--pico-border-color:#e74c3c;color:#e74c3c;">🗑️ 清空我的单词数据</button>';
+        html += '<p style="font-size:0.75rem;color:#999;margin-top:0.5rem;">清空当前账号所有单词（不含其他用户）</p>';
+        html += '</div>';
         document.getElementById('adminContent').innerHTML = html;
     } catch(e) { document.getElementById('adminContent').innerHTML = '<p style="color:red;">加载失败: ' + e.message + '</p>'; }
 };
+async function clearMyData() {
+    showConfirm('确定清空你所有单词数据？此操作不可恢复！', async function(){
+        try {
+            var r = await fetch('/api/words/clear', {method:'DELETE', headers:{'X-Phone': localStorage.getItem('phone')||''}});
+            var data = await r.json();
+            if (data.ok) {
+                showModal('已清空所有单词数据');
+                state.words = [];
+                refreshStats();
+                renderAdmin();
+            } else {
+                showModal('清空失败: ' + data.msg);
+            }
+        } catch(e) {
+            showModal('清空失败: ' + e.message);
+        }
+    });
+}
 // ============ 导入 ============
 async function importWords() {
     const text = document.getElementById('importText').value.trim();
@@ -487,23 +538,6 @@ async function exportWords() {
     a.download = `words_${new Date().toISOString().slice(0,10)}.csv`; a.click();
 }
 
-async function loadDemoWords() {
-    const data = `abandon, 放弃；遗弃, /əbændən/, They had to abandon the project., 他们不得不放弃这个项目。
-ability, 能力；才能, /əbɪlɪti/, He has great ability in math., 他有很强的数学能力。
-abroad, 在国外；到国外, /əbrɔːd/, He wants to study abroad., 他想出国留学。
-absent, 缺席的；不在的, /æbsənt/, He was absent from class today., 他今天没来。
-absolute, 绝对的；完全的, /æbsəluːt/, I have absolute trust in him., 我绝对信任他。`;
-    const lines = data.split('\n').filter(l=>l.trim());
-    const list = [];
-    for (const line of lines) {
-        const p = line.split(',').map(s=>s.trim());
-        if (p.length<2 || !p[0]) continue;
-        list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
-    }
-    await saveWords(list);
-    showModal(`加载 ${list.length} 个示范单词`);
-    await loadWords(true); refreshStats();
-}
 
 async function loadCET4() {
     try {
@@ -546,7 +580,7 @@ var _curveLoaded = false;
 
 async function renderCurveSettings() {
     // 从服务器加载，失败则回退 localStorage，再失败用默认
-    var intervals = [1, 1, 7, 30, 365];
+    var intervals = [1, 1, 3, 7, 30];
     if (!_curveLoaded) {
         try {
             var r = await api('GET', '/curve');
@@ -605,18 +639,65 @@ async function saveCurve() {
     showModal('已保存');
     showPage('pageHome');
 }
+
+async function resetCurve() {
+    const defaults = [1, 1, 3, 7, 30];  // T1=1h, T2=1d, T3=3d, T4=7d, T5=30d
+    localStorage.removeItem('curve_intervals');
+    // 存到服务器
+    try { await api('PUT', '/curve', defaults); } catch(e){}
+    STAGES[1].interval = defaults[0] / 24;
+    STAGES[2].interval = defaults[1];
+    STAGES[3].interval = defaults[2];
+    STAGES[4].interval = defaults[3];
+    STAGES[5].interval = defaults[4];
+    _curveLoaded = false;
+    renderCurveSettings();
+    showModal('已恢复默认');
+}
 document.getElementById('pageCurve') && renderCurveSettings();
 
 // ============ 自定义弹窗 ============
-function showModal(msg) {
+function showModal(msg, callback) {
     document.getElementById('modalMsg').textContent = msg;
     const m = document.getElementById('myModal');
     m.style.display = 'flex';
     m.style.alignItems = 'center';
     m.style.justifyContent = 'center';
+    // 显示确定按钮，隐藏取消
+    var btns = document.querySelectorAll('#modalBtns button');
+    if (btns.length >= 2) { btns[0].style.display = 'inline-block'; btns[1].style.display = 'none'; }
+    if (callback) m.setAttribute('data-cb', '1'); else m.removeAttribute('data-cb');
+    window._modalCallback = callback || null;
+}
+function showConfirm(msg, onOk) {
+    document.getElementById('modalMsg').textContent = msg;
+    const m = document.getElementById('myModal');
+    m.style.display = 'flex';
+    m.style.alignItems = 'center';
+    m.style.justifyContent = 'center';
+    // 显示两个按钮
+    var btns = document.querySelectorAll('#modalBtns button');
+    if (btns.length >= 2) { btns[0].style.display = 'inline-block'; btns[1].style.display = 'inline-block'; }
+    window._confirmCallback = onOk || null;
+    window._modalCallback = null;
+    m.removeAttribute('data-cb');
 }
 function closeModal() {
     document.getElementById('myModal').style.display = 'none';
+    if (window._modalCallback) {
+        var cb = window._modalCallback;
+        window._modalCallback = null;
+        setTimeout(cb, 50);
+    }
+    window._confirmCallback = null;
+}
+function confirmOk() {
+    document.getElementById('myModal').style.display = 'none';
+    if (window._confirmCallback) {
+        var cb = window._confirmCallback;
+        window._confirmCallback = null;
+        setTimeout(cb, 50);
+    }
 }
 
 // ============ 自动化自测 ============
@@ -879,7 +960,9 @@ window.__test.run = async function() {
         }
         var afterReview = state.words.filter(function(w){ return w.status==='learning'&&w.next_time&&w.next_time<=Date.now(); }).length;
         check('复习清空待复习='+afterReview, afterReview===0);
-        check('复习后自动加载新词', newBtn && newBtn.textContent.indexOf('下一张')>=0);
+        var hasNewWord = newBtn && newBtn.textContent.indexOf('下一张')>=0;
+        var hasDone = document.querySelector('#homeContent .empty') && document.querySelector('#homeContent .empty').textContent.indexOf('今日已完成')>=0;
+        check('复习后自动加载新词', hasNewWord || hasDone);
     } else {
         console.log('  ⚠️ 无复习词');
     }
@@ -897,6 +980,12 @@ window.__test.run = async function() {
     if (fail===0) console.log('%c  🎉 全部通过！','font-size:1.1rem;color:green');
     else console.log('%c  失败项目:','color:red', errs);
     if (caughtErrors.length>0) console.log('%c  捕获JS异常:','color:orange', caughtErrors);
+    // DOM输出（headless 截图用）
+    var reportEl = document.createElement('div');
+    reportEl.id = '__testReport';
+    reportEl.style.cssText = 'position:fixed;top:0;left:0;z-index:9999;background:#fff;padding:1rem;font-size:14px;border:2px solid '+(fail===0?'green':'red')+';width:100%;max-height:100vh;overflow:auto;';
+    reportEl.innerHTML = '<h3>自测报告</h3><p>通过: '+ok+' | 失败: '+fail+' | 耗时: '+(Date.now()-start)+'ms'+(fail===0?' 🎉':' ❌')+'</p>'+(errs.length?'<p style=color:red>失败项: '+errs.join(', ')+'</p>':'')+(caughtErrors.length?'<p style=color:orange>JS异常: '+caughtErrors.join(', ')+'</p>':'');
+    document.body.appendChild(reportEl);
     return {ok:ok, fail:fail, errors:errs};
 };
 
@@ -919,6 +1008,33 @@ if (phone) {
     if (window.location.search.indexOf('test=1') !== -1) {
         setTimeout(function(){ window.__test.run(); }, 1000);
     }
+    // URL参数 ?test=1&phone=xxx&pw=xxx 自动登录后跑自测（不刷新页面，兼容headless）
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('test')) {
+        var testPhone = params.get('phone') || localStorage.getItem('phone');
+        var testPw = params.get('pw') || 'w12345678';
+        if (!localStorage.getItem('phone') && testPhone) {
+            (async function(){
+                var r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone:testPhone,password:testPw})});
+                var d = await r.json();
+                if (!d.ok) {
+                    r = await fetch('/api/register', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone:testPhone,password:testPw})});
+                    d = await r.json();
+                }
+                if (d.ok) {
+                    localStorage.setItem('phone', testPhone);
+                    localStorage.setItem('is_admin', d.is_admin?'1':'0');
+                    // 直接初始化页面，不 reload
+                    document.getElementById('loginPage').style.display='none';
+                    document.getElementById('mainApp').style.display='block';
+                    document.getElementById('userPhone').textContent = testPhone;
+                    loadState();
+                    if (localStorage.getItem('is_admin') === '1') document.getElementById('bnavAdmin').style.display='inline';
+                    setTimeout(function(){ window.__test.run(); }, 1000);
+                }
+            })();
+        }
+    }
 }
 </script>
 
@@ -926,7 +1042,10 @@ if (phone) {
 <div id="myModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:999;align-items:center;justify-content:center;" onclick="if(event.target===this)closeModal()">
     <div style="background:white;border-radius:20px;padding:2rem 1.5rem 1.5rem;max-width:320px;width:85%;box-shadow:0 8px 30px rgba(0,0,0,0.12);text-align:center;">
         <p id="modalMsg" style="font-size:1rem;color:#333;margin-bottom:1.5rem;line-height:1.6;"></p>
-        <button onclick="closeModal()" style="background:#0066cc;border:none;color:white;border-radius:24px;padding:0.6rem 2rem;font-size:0.9rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,102,204,0.3);">确定</button>
+        <div id="modalBtns">
+            <button onclick="confirmOk()" class="modal-btn modal-btn-primary">确定</button>
+            <button onclick="closeModal()" class="modal-btn modal-btn-secondary" style="display:none;">取消</button>
+        </div>
     </div>
 </div>
 </body>

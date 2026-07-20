@@ -19,6 +19,7 @@ def get_db():
             example TEXT, example_cn TEXT, stage INTEGER DEFAULT 0,
             next_time REAL, last_time REAL, status TEXT DEFAULT 'new',
             fail_count INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'import',
             UNIQUE(phone, word))''')
         g.db.commit()
     return g.db
@@ -82,12 +83,13 @@ def words():
         count = 0
         for w in (data if isinstance(data, list) else [data]):
             db.execute('''INSERT OR REPLACE INTO words
-                (phone, word, meaning, phonetic, example, example_cn, stage, next_time, last_time, status, fail_count)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+                (phone, word, meaning, phonetic, example, example_cn, stage, next_time, last_time, status, fail_count, source)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (phone, w['word'], w.get('meaning',''), w.get('phonetic',''),
                  w.get('example',''), w.get('example_cn',''),
                  w.get('stage',0), w.get('next_time'), w.get('last_time'),
-                 w.get('status','new'), w.get('fail_count',0)))
+                 w.get('status','new'), w.get('fail_count',0),
+                 w.get('source','import')))
             count += 1
         db.commit()
         return jsonify({'ok':True, 'count': count})
@@ -99,6 +101,16 @@ def words():
         db.commit()
         return jsonify({'ok':True})
 
+@app.route('/api/words/clear', methods=['DELETE'])
+def clear_words():
+    """清空当前用户所有单词数据（必须在 /api/words/<word> 之前定义）"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    db = get_db()
+    db.execute('DELETE FROM words WHERE phone=?', (phone,))
+    db.commit()
+    return jsonify({'ok':True, 'msg':'已清空'})
+
 @app.route('/api/words/<word>', methods=['DELETE'])
 def delete_word(word):
     phone = request.headers.get('X-Phone','')
@@ -107,6 +119,17 @@ def delete_word(word):
     db.execute('DELETE FROM words WHERE phone=? AND word=?', (phone, word))
     db.commit()
     return jsonify({'ok':True})
+
+# ============ 词库统计 ============
+
+@app.route('/api/stats', methods=['GET'])
+def word_stats():
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    db = get_db()
+    rows = db.execute('SELECT source, COUNT(*) as cnt FROM words WHERE phone=? GROUP BY source', (phone,)).fetchall()
+    total = db.execute('SELECT COUNT(*) as cnt FROM words WHERE phone=?', (phone,)).fetchone()['cnt']
+    return jsonify({'ok':True, 'total': total, 'sources': {r['source']:r['cnt'] for r in rows}})
 
 # ============ 遗忘曲线设置 ============
 

@@ -1,0 +1,10 @@
+RC=1
+d:\code\recite-app\__j.js:597
+            console.log('\nc('词总数='+snap.wordCount+' (当前'+words.length+')', words.length === snap.wordCount');
+                        ^^^^^^
+
+SyntaxError: missing ) after argument list
+    at wrapSafe (node:internal/modules/cjs/loader:1787:18)
+    at checkSyntax (node:internal/main/check_syntax:76:3)
+
+Node.js v24.16.0

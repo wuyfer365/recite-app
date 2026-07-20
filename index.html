@@ -78,17 +78,7 @@ body { padding-bottom: 3.5rem; }
 <div id="mainApp" style="display:none;">
 <div class="header">
     <h1>📚 单词记忆 <span id="userPhone" style="font-size:0.7rem;color:#888;"></span></h1>
-    <!-- 第一行：词库筛选（拉满宽度） -->
-    <div style="display:flex;gap:0.3rem;align-items:center;margin-bottom:0.3rem;">
-        <span style="font-size:0.75rem;color:#888;white-space:nowrap;">词库</span>
-        <select id="sourceFilter" style="flex:1;margin-bottom:0;font-size:0.8rem;height:44px;" onchange="onSourceChange()">
-            <option value="">全部</option>
-            <option value="cet4">CET-4</option>
-            <option value="primary">小学</option>
-            <option value="import">自定义</option>
-        </select>
-    </div>
-    <!-- 第二行：每日设置 + 操作（保持原布局） -->
+    <!-- 第一行：每日设置（保持原布局不变） -->
     <div style="display:flex;gap:0.3rem;align-items:center;">
         <span style="font-size:0.75rem;color:#888;white-space:nowrap;">每日</span>
         <input type="number" id="dailyLimit" value="100" min="10" max="999" style="width:50px;padding:0.2rem;text-align:center;margin-bottom:0;height:44px;">
@@ -98,6 +88,16 @@ body { padding-bottom: 3.5rem; }
             <option value="review">复习</option>
         </select>
         <button onclick="logout()" class="outline" style="padding:0.2rem 0.5rem;font-size:0.7rem;height:42px;">退出</button>
+    </div>
+    <!-- 第二行：词库筛选（拉满对齐） -->
+    <div style="display:flex;gap:0.3rem;align-items:center;margin-top:0.3rem;">
+        <span style="font-size:0.75rem;color:#888;white-space:nowrap;">词库</span>
+        <select id="sourceFilter" style="flex:1;margin-bottom:0;font-size:0.8rem;height:44px;" onchange="onSourceChange()">
+            <option value="">全部</option>
+            <option value="cet4">CET-4</option>
+            <option value="primary">小学</option>
+            <option value="import">自定义</option>
+        </select>
     </div>
 </div>
 <div class="stats-grid">

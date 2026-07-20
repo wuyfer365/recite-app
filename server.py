@@ -82,7 +82,7 @@ def words():
         data = request.json  # list of words
         count = 0
         for w in (data if isinstance(data, list) else [data]):
-            db.execute('''INSERT OR REPLACE INTO words
+            db.execute('''INSERT OR IGNORE INTO words
                 (phone, word, meaning, phonetic, example, example_cn, stage, next_time, last_time, status, fail_count, source)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (phone, w['word'], w.get('meaning',''), w.get('phonetic',''),

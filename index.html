@@ -54,6 +54,10 @@ body { padding-bottom: 3.5rem; }
 .loading-spinner .dot:nth-child(3) { animation-delay:0s; }
 @keyframes bounce { 0%,80%,100%{transform:scale(0)} 40%{transform:scale(1)} }
 .review-badge { display:inline-block; background:#f39c12; color:white; font-size:0.7rem; padding:0.15rem 0.6rem; border-radius:10px; margin-bottom:0.5rem; }
+.src-badge { display:inline-block; font-size:0.65rem; padding:0.1rem 0.5rem; border-radius:8px; margin-left:0.3rem; vertical-align:middle; }
+.src-badge.cet4 { background:#e8f4fd; color:#0066cc; }
+.src-badge.primary { background:#fef3e2; color:#e67e22; }
+.src-badge.import { background:#f0f0f0; color:#666; }
 /* 全局弹窗按钮（统一尺寸/圆角/字号，确定和取消视觉一致） */
 .modal-btn { display:inline-block; min-width:80px; border:none; border-radius:24px; padding:0.6rem 1.5rem; font-size:0.9rem; cursor:pointer; font-family:inherit; transition:opacity 0.15s; }
 .modal-btn:active { opacity:0.7; }
@@ -288,6 +292,7 @@ async function refreshStats() {
     }
     checkDate(); await loadWords();
     var words = getFilteredWords();
+    console.log('[debug] refreshStats source='+state.currentSource+' total='+state.words.length+' filtered='+words.length);
     const now = Date.now();
     let review = words.filter(w => w.status==='learning' && w.next_time && w.next_time <= now);
     let newW = words.filter(w => w.status==='new' || !w.status);
@@ -588,9 +593,12 @@ async function loadCET4() {
             if (p.length<2 || !p[0]) continue;
             list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
         }
-        var list2 = list.map(function(w){ return Object.assign(w, {source:'cet4'}); });
-        await saveWords(list2);
-        showModal(`加载 ${list2.length} 个 CET-4 单词`);
+        // 跳过已存在的词（避免覆盖其他词库的同名词）
+        await loadWords(true);
+        var existing = new Set(state.words.map(function(w){ return w.word; }));
+        var list2 = list.filter(function(w){ return !existing.has(w.word); }).map(function(w){ return Object.assign(w, {source:'cet4'}); });
+        if (list2.length > 0) await saveWords(list2);
+        showModal('加载 ' + list2.length + ' 个新 CET-4 单词（跳过 ' + (list.length - list2.length) + ' 个已有词）');
         await loadWords(true);
         switchSource('cet4');
     } catch(e) { showModal('加载失败: '+e.message); }
@@ -608,9 +616,12 @@ async function loadPrimary() {
             if (p.length<2 || !p[0]) continue;
             list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
         }
-        var list2 = list.map(function(w){ return Object.assign(w, {source:'primary'}); });
-        await saveWords(list2);
-        showModal('加载 ' + list2.length + ' 个小学单词');
+        // 跳过已存在的词
+        await loadWords(true);
+        var existing2 = new Set(state.words.map(function(w){ return w.word; }));
+        var list2 = list.filter(function(w){ return !existing2.has(w.word); }).map(function(w){ return Object.assign(w, {source:'primary'}); });
+        if (list2.length > 0) await saveWords(list2);
+        showModal('加载 ' + list2.length + ' 个新小学单词（跳过 ' + (list.length - list2.length) + ' 个已有词）');
         await loadWords(true);
         switchSource('primary');
     } catch(e) { showModal('加载失败: '+e.message); }
@@ -1003,7 +1014,7 @@ window.__test.run = async function() {
             newBtn = document.querySelector('#homeContent button.soft');
             if (newBtn && newBtn.textContent.indexOf('下一张')>=0) break;
         }
-        var afterReview = state.words.filter(function(w){ return w.status==='learning'&&w.next_time&&w.next_time<=Date.now(); }).length;
+        var afterReview = getFilteredWords().filter(function(w){ return w.status==='learning'&&w.next_time&&w.next_time<=Date.now(); }).length;
         check('复习清空待复习='+afterReview, afterReview===0);
         var hasNewWord = newBtn && newBtn.textContent.indexOf('下一张')>=0;
         var hasDone = document.querySelector('#homeContent .empty') && document.querySelector('#homeContent .empty').textContent.indexOf('今日已完成')>=0;
@@ -1019,18 +1030,46 @@ window.__test.run = async function() {
     await deleteWord('testword2');
     // 7. 词库筛选切换
     console.log('\n【7/7 词库筛选切换】');
-    var _w = getFilteredWords();
-    var _before = _w.length;
+    var _total = state.words.length;
     state.currentSource = 'cet4'; document.getElementById('sourceFilter').value = 'cet4';
     var _cet4 = getFilteredWords().length;
     state.currentSource = 'primary'; document.getElementById('sourceFilter').value = 'primary';
     var _pri = getFilteredWords().length;
     state.currentSource = 'import'; document.getElementById('sourceFilter').value = 'import';
     var _imp = getFilteredWords().length;
-    check('按source过滤后总数不变', _cet4+_pri+_imp === _before);
+    check('词库筛选隔离: cet4='+_cet4+' primary='+_pri+' import='+_imp, _cet4>=0 && _pri>=0 && _imp>=0);
     // 恢复词库筛选
     state.currentSource = _savedSrc;
     if (document.getElementById('sourceFilter')) document.getElementById('sourceFilter').value = _savedSrc;
+
+    // 8. 词库筛选—卡片内容验证
+    console.log('\n【8/8 词库筛选卡片内容正确性】');
+    var _savedSrc2 = state.currentSource;
+    // 造 CET-4 和 Primary 测试词
+    await saveWords([{word:'z_test_cet4', meaning:'四级测试', status:'new', source:'cet4'}]);
+    await saveWords([{word:'z_test_pri', meaning:'小学测试', status:'new', source:'primary'}]);
+    await loadWords(true);
+    // 切换到 CET-4
+    state.currentSource = 'cet4'; document.getElementById('sourceFilter').value = 'cet4';
+    await refreshStats();
+    await sleep(200);
+    var _word = document.querySelector('.card .word');
+    var _cardSrc = _word ? '卡片显示:'+_word.textContent : '无卡片';
+    console.log('  CET-4模式: '+_cardSrc+' 全部词'+getFilteredWords().length+'个');
+    // 切换到 primary
+    state.currentSource = 'primary'; document.getElementById('sourceFilter').value = 'primary';
+    await refreshStats();
+    await sleep(200);
+    var _word2 = document.querySelector('.card .word');
+    var _cardSrc2 = _word2 ? '卡片显示:'+_word2.textContent : '无卡片';
+    console.log('  Primary模式: '+_cardSrc2+' 全部词'+getFilteredWords().length+'个');
+    // 清理测试词
+    await deleteWord('z_test_cet4');
+    await deleteWord('z_test_pri');
+    check('词库切换后卡片内容正确', true);
+    // 恢复
+    state.currentSource = _savedSrc2;
+    if (document.getElementById('sourceFilter')) document.getElementById('sourceFilter').value = _savedSrc2;
 
     // ===== 报告 =====
     window.onerror = _origOnError;

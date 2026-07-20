@@ -86,18 +86,20 @@ function randomId() { return 'ztest_' + Date.now().toString(36); }
     // showModal 直接用硬编码元素，不需要 DOM 空值防护
 
     // ======== 前端功能检查（防止改代码丢了功能） ========
-    console.log('\n【功能检查】词库筛选、导入确认、重置曲线、来源标记');
+    console.log('\n【功能检查】词库筛选、来源标记、导入确认、重置曲线');
     // 1. 词库筛选
     const hasSourceFilter = html.includes('id="sourceFilter"');
     check('词库筛选下拉框 #sourceFilter 存在', hasSourceFilter, false);
     check('词库筛选选项 cet4', hasSourceFilter && html.includes('cet4'), false);
     check('词库筛选选项 primary', hasSourceFilter && html.includes('primary'), false);
     check('词库筛选选项 import', hasSourceFilter && html.includes('"import"') || html.includes("'import'"), false);
-    if (hasSourceFilter) check('refreshStats 使用 sourceFilter', html.includes('sourceFilter.value') || html.includes('sourceFilter'), false);
+    check('getFilteredWords 函数', html.includes('function getFilteredWords'), false);
+    check('switchSource 函数', html.includes('function switchSource'), false);
 
-    // 2. 来源标记 (单词列表显示所属词库)
-    const hasSourceTag = html.includes('class="source"') || html.includes('source-badge') || html.includes('class.*source') && html.includes('cet4');
-    check('单词列表有来源标记显示', hasSourceTag, false);
+    // 2. 导入页词库标签
+    const hasImportSource = html.includes('id="importSource"');
+    check('导入页词库标签 #importSource', hasImportSource, false);
+    check('importWords 传 source', html.includes("source: src") || html.includes('source:src'), false);
 
     // 3. 导入确认弹窗
     const hasImportConfirm = html.includes('showConfirm') || html.includes('importConfirm') || html.includes('confirmImport');

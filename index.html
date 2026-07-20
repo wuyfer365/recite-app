@@ -537,7 +537,10 @@ function switchSource(src) {
     state.currentSource = src;
     document.getElementById('sourceFilter').value = src;
     localStorage.setItem('recite_source', src);
-    refreshStats();
+    // 刷新当前可见页面
+    var active = document.querySelector('.page.active');
+    if (active) showPage(active.id);
+    else refreshStats();
 }
 
 async function importWords() {

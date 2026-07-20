@@ -10,7 +10,7 @@
 :root { --pico-font-size: 100%; }
 body { padding: 1rem; background: #f5f7fb; }
 .container { max-width: 480px; margin: 0 auto; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.header { display: flex; flex-direction: column; margin-bottom: 1rem; }
 .header h1 { font-size: 1.4rem; margin: 0; }
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
 .stat-card { background: white; border-radius: 12px; padding: 0.8rem; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
@@ -78,20 +78,20 @@ body { padding-bottom: 3.5rem; }
 <div id="mainApp" style="display:none;">
 <div class="header">
     <h1>📚 单词记忆 <span id="userPhone" style="font-size:0.7rem;color:#888;"></span></h1>
-    <!-- 第一行：每日设置（保持原布局不变） -->
+    <!-- 第一行：每日设置 -->
     <div style="display:flex;gap:0.3rem;align-items:center;">
-        <span style="font-size:0.75rem;color:#888;white-space:nowrap;">每日</span>
+        <span style="font-size:0.75rem;color:#888;white-space:nowrap;width:2rem;">每日</span>
         <input type="number" id="dailyLimit" value="100" min="10" max="999" style="width:50px;padding:0.2rem;text-align:center;margin-bottom:0;height:44px;">
-        <select id="modeSelect" style="display:inline;width:auto;margin-bottom:0;font-size:0.8rem;height:44px;">
+        <select id="modeSelect" style="flex:1;min-width:60px;margin-bottom:0;font-size:0.8rem;height:44px;">
             <option value="mix">混合</option>
             <option value="new">新词</option>
             <option value="review">复习</option>
         </select>
         <button onclick="logout()" class="outline" style="padding:0.2rem 0.5rem;font-size:0.7rem;height:42px;">退出</button>
     </div>
-    <!-- 第二行：词库筛选（拉满对齐） -->
+    <!-- 第二行：词库筛选（与上方控件左右对齐） -->
     <div style="display:flex;gap:0.3rem;align-items:center;margin-top:0.3rem;">
-        <span style="font-size:0.75rem;color:#888;white-space:nowrap;">词库</span>
+        <span style="font-size:0.75rem;color:#888;white-space:nowrap;width:2rem;">词库</span>
         <select id="sourceFilter" style="flex:1;margin-bottom:0;font-size:0.8rem;height:44px;" onchange="onSourceChange()">
             <option value="">全部</option>
             <option value="cet4">CET-4</option>
@@ -541,10 +541,12 @@ function switchSource(src) {
     state.currentSource = src;
     document.getElementById('sourceFilter').value = src;
     localStorage.setItem('recite_source', src);
-    // 刷新当前可见页面
+    state._wordsLoaded = false;
+    // 先刷新统计数据（全局，无论当前页面）
+    refreshStats();
+    // 再按当前页刷新完整内容
     var active = document.querySelector('.page.active');
-    if (active) showPage(active.id);
-    else refreshStats();
+    if (active && active.id !== 'pageHome') showPage(active.id);
 }
 
 async function importWords() {
@@ -1017,6 +1019,17 @@ window.__test.run = async function() {
     await deleteWord('test_auto2');
     await deleteWord('testword');
     await deleteWord('testword2');
+    // 7. 词库筛选切换
+    console.log('\n【7/7 词库筛选切换】');
+    var _w = getFilteredWords();
+    var _before = _w.length;
+    state.currentSource = 'cet4'; document.getElementById('sourceFilter').value = 'cet4';
+    var _cet4 = getFilteredWords().length;
+    state.currentSource = 'primary'; document.getElementById('sourceFilter').value = 'primary';
+    var _pri = getFilteredWords().length;
+    state.currentSource = 'import'; document.getElementById('sourceFilter').value = 'import';
+    var _imp = getFilteredWords().length;
+    check('按source过滤后总数不变', _cet4+_pri+_imp === _before);
     // 恢复词库筛选
     state.currentSource = _savedSrc;
     if (document.getElementById('sourceFilter')) document.getElementById('sourceFilter').value = _savedSrc;

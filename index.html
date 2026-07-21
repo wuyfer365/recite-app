@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>单词记忆</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
@@ -215,7 +218,7 @@ function calcNextTime(stage, result) {
 }
 
 // ============ 状态 ============
-let state = {mode:'mix', dailyLimit:100, words:[], todayDate:'', todayStudied:0, todayReviewed:0, _wordsLoaded:false, currentSource:'', reviewDeduct:false};
+let state = {mode:'mix', dailyLimit:100, words:[], todayDate:'', todayStudied:0, todayReviewed:0, _wordsLoaded:false, currentSource:'', reviewDeduct:false, _forceNextFetch:false};
 
 function loadState() {
     try {
@@ -292,9 +295,20 @@ function checkDate() {
 }
 
 async function loadWords(force) {
-    if (!force && state._wordsLoaded) return;
-    // 从 localStorage 缓存秒开
-    if (!force && state.words.length===0) {
+    var reallyForce;
+    var skipFlag = sessionStorage.getItem('_skipCache');
+    console.log('[DBG] loadWords force=' + force + ' skipFlag=' + skipFlag + ' _loaded=' + state._wordsLoaded + ' words.len=' + state.words.length);
+    if (skipFlag) {
+        console.log('[DBG] loadWords: skipCache=true, forcing network fetch');
+        sessionStorage.removeItem('_skipCache');
+        reallyForce = true;
+    } else {
+        reallyForce = force || state._forceNextFetch;
+    }
+    state._forceNextFetch = false;
+    if (!reallyForce && state._wordsLoaded) { console.log('[DBG] loadWords: early return'); return; }
+    // 从 localStorage 缓存秒开（仅首次加载无force时）
+    if (!reallyForce && state.words.length===0) {
         try {
             var cached = JSON.parse(localStorage.getItem('recite_words_cache'));
             if (cached && cached.words && Array.isArray(cached.words)) {
@@ -306,7 +320,6 @@ async function loadWords(force) {
                         state.words = fresh;
                         updateSourceFilter();
                         try { localStorage.setItem('recite_words_cache', JSON.stringify({words:fresh, time:Date.now()})); } catch(e){}
-                        // 如果首页可见，刷新统计
                         if (document.getElementById('pageHome').classList.contains('active')) updateStats();
                     }
                 });
@@ -316,36 +329,48 @@ async function loadWords(force) {
     }
     // 无缓存或强制刷新，走网络
     var fresh = await getAllWords();
+    console.log('[DBG] loadWords: got ' + (fresh ? fresh.length : 0) + ' words from server');
     if (fresh && fresh.length > 0 || !state._wordsLoaded) {
         state.words = fresh;
         state._wordsLoaded = true;
         updateSourceFilter();
         try { localStorage.setItem('recite_words_cache', JSON.stringify({words:fresh, time:Date.now()})); } catch(e){}
     }
+    console.log('[DBG] loadWords: done, state.words=' + state.words.length);
 }
 
 async function refreshStats() {
-    // 只有确定要等网络时才显示 loading
-    if (!state._wordsLoaded) {
+    console.log('[DBG] refreshStats start _forceNextFetch=' + state._forceNextFetch + ' _loaded=' + state._wordsLoaded);
+    // 强制拉新或首次加载时显示 loading 转圈
+    var shouldShowLoading = state._forceNextFetch || !state._wordsLoaded;
+    console.log('[DBG] shouldShowLoading=' + shouldShowLoading);
+    if (shouldShowLoading) {
+        document.getElementById('loadingSpinner').classList.add('active');
+    } else {
         var hasCache = false;
         try { var c = JSON.parse(localStorage.getItem('recite_words_cache')); hasCache = !!(c && c.words && c.words.length); } catch(e){}
         if (!hasCache) document.getElementById('loadingSpinner').classList.add('active');
     }
     checkDate(); await loadWords();
+    console.log('[DBG] after loadWords state.words.length=' + state.words.length + ' currentSource=' + state.currentSource);
     var words = getFilteredWords();
-    console.log('[debug] refreshStats source='+state.currentSource+' total='+state.words.length+' filtered='+words.length);
+    console.log('[DBG] getFilteredWords()=' + words.length);
+    console.log('[DBG] refreshStats source='+state.currentSource+' total='+state.words.length+' filtered='+words.length);
     const now = Date.now();
     let review = words.filter(w => w.status==='learning' && w.next_time && w.next_time <= now);
     let newW = words.filter(w => w.status==='new' || !w.status);
     let mastered = words.filter(w => w.status==='mastered');
+    console.log('[DBG] review=' + review.length + ' new=' + newW.length + ' mastered=' + mastered.length);
     var consumed = state.todayStudied + (state.reviewDeduct ? state.todayReviewed : 0);
     let remaining = Math.max(0, state.dailyLimit - consumed);
+    console.log('[DBG] dailyLimit=' + state.dailyLimit + ' consumed=' + consumed + ' remaining=' + remaining);
     document.getElementById('statReview').textContent = review.length;
-    document.getElementById('statNew').textContent = remaining + '/' + newW.length;
+    document.getElementById('statNew').textContent = (newW.length > 0 ? remaining + '/' + newW.length : '0');
     document.getElementById('statMastered').textContent = mastered.length;
     document.getElementById('dailyLimit').value = state.dailyLimit;
     renderHome(review, newW);
     document.getElementById('loadingSpinner').classList.remove('active');
+    console.log('[DBG] statNew display=' + document.getElementById('statNew').textContent);
 }
 
 function showPage(id) {
@@ -355,11 +380,11 @@ function showPage(id) {
     document.querySelectorAll('.bnav').forEach(b => b.classList.remove('active'));
     var btn = document.getElementById('bnav' + id.substring(4));
     if (btn) btn.classList.add('active');
-    if (id==='pageWords') renderWordList();
-    if (id==='pageStats') renderStatsPage();
-    if (id==='pageHome') refreshStats();
+    if (id==='pageWords') { state._forceNextFetch = true; renderWordList(); }
+    if (id==='pageStats') { state._forceNextFetch = true; renderStatsPage(); }
+    if (id==='pageHome') { state._forceNextFetch = true; refreshStats(); }
     if (id==='pageRank') renderRank();
-    if (id==='pageAdmin') renderAdmin();
+    if (id==='pageAdmin') { state._forceNextFetch = true; renderAdmin(); }
     if (id==='pageRules') renderRules();
     if (id==='pageCurve') { _curveLoaded=false; renderCurveSettings(); }
 }
@@ -374,7 +399,7 @@ function updateStats() {
     document.getElementById('statReview').textContent = review;
     var consumed = state.todayStudied + (state.reviewDeduct ? state.todayReviewed : 0);
     var rem = Math.max(0, state.dailyLimit - consumed);
-    document.getElementById('statNew').textContent = rem + '/' + newW;
+    document.getElementById('statNew').textContent = (newW > 0 ? rem + '/' + newW : '0');
     document.getElementById('statMastered').textContent = mastered;
 }
 
@@ -391,7 +416,11 @@ function renderHome(review, newW) {
     else if (mode==='new') { list=newW.slice(0,Math.max(0,remaining)); rv=false; }
     else { if (review.length>0) { list=review; rv=true; } else { list=newW.slice(0,Math.max(0,remaining)); rv=false; } }
     if (list.length===0) {
-        document.getElementById('homeContent').innerHTML = `<div class="empty"><p>✅ 今日已完成</p><p style="font-size:0.8rem;">学${state.todayStudied} 复习${state.todayReviewed}</p></div>`;
+        if (state.words.length === 0) {
+            document.getElementById('homeContent').innerHTML = '<div class="empty"><p>📭 暂无单词</p><p style="font-size:0.8rem;">请先导入词库</p></div>';
+        } else {
+            document.getElementById('homeContent').innerHTML = '<div class="empty"><p>✅ 今日已完成</p><p style="font-size:0.8rem;">学' + state.todayStudied + ' 复习' + state.todayReviewed + '</p></div>';
+        }
         return;
     }
     currentWords=list; currentIndex=0; isReview=rv;
@@ -492,6 +521,13 @@ async function rateWord(result) {
 
 // ============ 词库 ============
 async function renderWordList() {
+    var listEl = document.getElementById('wordList');
+    // 强制拉新或数据未加载时显示 loading
+    if (state._forceNextFetch || !state._wordsLoaded) {
+        listEl.innerHTML = '<div class="loading-spinner active"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+    } else if (state._wordsLoaded && state.words.length > 0 && getFilteredWords().length === 0) {
+        listEl.innerHTML = '<div class="empty">⏳ 数据加载中...</div>';
+    }
     await loadWords();
     var words = getFilteredWords();
     if (words.length===0) {
@@ -579,10 +615,11 @@ async function renderAdmin() {
         html += '<option value="">— 选择要清空的用户 —</option>';
         for (var j=0;j<users.length;j++) {
             var uu = users[j];
-            html += '<option value="' + uu.phone + '">****' + uu.phone.slice(-4) + '（' + (uu.mastered||0) + '词/共' + (uu.word_count||0) + '）</option>';
+            var display = uu.phone.slice(0,3) + '****' + uu.phone.slice(-4);
+            html += '<option value="' + uu.phone + '">' + display + '（' + (uu.mastered||0) + '词/共' + (uu.word_count||0) + '）</option>';
         }
         html += '</select>';
-        html += '<button onclick="adminClearUser()" class="outline" style="--pico-background-color:#e74c3c;--pico-border-color:#e74c3c;color:#e74c3c;white-space:nowrap;height:44px;">🗑️ 清空</button>';
+        html += '<button onclick="adminClearUser()" style="background:#e74c3c;color:#fff;border:none;border-radius:8px;height:44px;width:60px;font-size:0.85rem;cursor:pointer;">删除</button>';
         html += '</div>';
         html += '<p style="font-size:0.75rem;color:#999;margin-top:0.5rem;">选择用户后点清空，不可恢复</p>';
         html += '</div>';
@@ -800,32 +837,36 @@ function adminClearUser() {
     var sel = document.getElementById('clearUserSelect');
     var phone = sel.value;
     if (!phone) { showModal('请先选择用户'); return; }
-    showConfirm('确定清空 ****' + phone.slice(-4) + ' 的所有单词数据？不可恢复！', async function(){
-        try {
-            var r = await fetch('/api/admin/clear-user?phone=' + encodeURIComponent(phone), {method:'DELETE', headers:{'X-Phone': localStorage.getItem('phone')||''}});
-            var data = await r.json();
-            showModal(data.msg || (data.ok ? '已清空' : '失败'));
-            renderAdmin();
-        } catch(e) { showModal('失败: '+e.message); }
+    showConfirm('确定清空 ****' + phone.slice(-4) + ' 的所有单词数据？不可恢复！', function(){
+        fetch('/api/admin/clear-user?phone=' + encodeURIComponent(phone), {method:'DELETE', headers:{'X-Phone': localStorage.getItem('phone')||''}})
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if (data.ok) {
+                    try { localStorage.removeItem('recite_words_cache'); } catch(e){}
+                    try { localStorage.removeItem('recite_state'); } catch(e){}
+                    window.location.href = '/?cleared=' + Date.now();
+                } else {
+                    showModal('清空失败: ' + data.msg);
+                }
+            })
+            .catch(function(e){ showModal('清空失败: ' + e.message); });
     });
 }
 
-async function clearMyData() {
-    showConfirm('确定清空你所有单词数据？此操作不可恢复！', async function(){
-        try {
-            var r = await fetch('/api/words/clear', {method:'DELETE', headers:{'X-Phone': localStorage.getItem('phone')||''}});
-            var data = await r.json();
-            if (data.ok) {
-                showModal('已清空所有单词数据');
-                state.words = [];
-                refreshStats();
-                renderAdmin();
-            } else {
-                showModal('清空失败: ' + data.msg);
-            }
-        } catch(e) {
-            showModal('清空失败: ' + e.message);
-        }
+function clearMyData() {
+    showConfirm('确定清空你所有单词数据？此操作不可恢复！', function(){
+        fetch('/api/words/clear', {method:'DELETE', headers:{'X-Phone': localStorage.getItem('phone')||''}})
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                if (data.ok) {
+                    try { localStorage.removeItem('recite_words_cache'); } catch(e){}
+                    try { localStorage.removeItem('recite_state'); } catch(e){}
+                    window.location.href = '/?cleared=' + Date.now();
+                } else {
+                    showModal('清空失败: ' + data.msg);
+                }
+            })
+            .catch(function(e){ showModal('清空失败: ' + e.message); });
     });
 }
 // ============ 导入 ============
@@ -835,6 +876,7 @@ async function switchSource(src) {
     document.getElementById('sourceFilter').value = src;
     localStorage.setItem('recite_source', src);
     state._wordsLoaded = false;
+    state._forceNextFetch = true;
     // 切换词库时重置今日计数，避免旧词库的复习量影响新词库
     state.todayStudied = 0;
     state.todayReviewed = 0;
@@ -889,6 +931,8 @@ async function loadCET4() {
         await api('DELETE', '/words/source/cet4');
         var list2 = list.map(function(w){ return Object.assign(w, {source:'cet4'}); });
         if (list2.length > 0) await saveWords(list2);
+        try { localStorage.removeItem('recite_words_cache'); } catch(e){}
+        state._forceNextFetch = true;
         showModal('加载 ' + list2.length + ' 个 CET-4 单词');
         updateSourceFilter();
         await loadWords(true);
@@ -937,6 +981,9 @@ async function loadGrade(shortName, displayName) {
         await api('DELETE', '/words/source/' + encodeURIComponent(source));
         var list2 = list.map(function(w){ return Object.assign(w, {source:source}); });
         if (list2.length > 0) await saveWords(list2);
+        // 清除缓存并强制下次拉新
+        try { localStorage.removeItem('recite_words_cache'); } catch(e){}
+        state._forceNextFetch = true;
         showModal('加载 ' + list2.length + ' 个' + displayName + '单词');
         updateSourceFilter();
         await loadWords(true);
@@ -1047,9 +1094,14 @@ function showModal(msg, callback) {
     m.style.display = 'flex';
     m.style.alignItems = 'center';
     m.style.justifyContent = 'center';
-    // 显示确定按钮，隐藏取消
+    // 显示确定按钮，隐藏取消，强制绑定处理函数
     var btns = document.querySelectorAll('#modalBtns button');
-    if (btns.length >= 2) { btns[0].style.display = 'inline-block'; btns[1].style.display = 'none'; }
+    if (btns.length >= 2) {
+        btns[0].style.display = 'inline-block';
+        btns[0].onclick = confirmOk;
+        btns[1].style.display = 'none';
+        btns[1].onclick = closeModal;
+    }
     if (callback) m.setAttribute('data-cb', '1'); else m.removeAttribute('data-cb');
     window._modalCallback = callback || null;
 }
@@ -1059,9 +1111,14 @@ function showConfirm(msg, onOk) {
     m.style.display = 'flex';
     m.style.alignItems = 'center';
     m.style.justifyContent = 'center';
-    // 显示两个按钮
+    // 显示两个按钮，强制绑定正确的处理函数
     var btns = document.querySelectorAll('#modalBtns button');
-    if (btns.length >= 2) { btns[0].style.display = 'inline-block'; btns[1].style.display = 'inline-block'; }
+    if (btns.length >= 2) {
+        btns[0].style.display = 'inline-block';
+        btns[0].onclick = confirmOk;
+        btns[1].style.display = 'inline-block';
+        btns[1].onclick = closeModal;
+    }
     window._confirmCallback = onOk || null;
     window._modalCallback = null;
     m.removeAttribute('data-cb');
@@ -1449,6 +1506,13 @@ if (phone) {
                 }).catch(function(){});
         }
     })();
+    // 检测 cleared 参数（从清空数据跳转而来），跳过缓存
+    if (window.location.search.indexOf('cleared=') !== -1) {
+        state._forceNextFetch = true;
+        try { localStorage.removeItem('recite_words_cache'); } catch(e){}
+        try { localStorage.removeItem('recite_state'); } catch(e){}
+        history.replaceState(null, '', '/');
+    }
     refreshStats();
     // URL参数 ?test=1 自动跑自测
     if (window.location.search.indexOf('test=1') !== -1) {

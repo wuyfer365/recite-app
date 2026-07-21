@@ -717,8 +717,10 @@ async function renderRank() {
         // 个人设置区
         html += '<div style="margin-top:1rem;padding-top:1rem;border-top:2px solid #eee;">';
         html += '<h3 style="font-size:0.9rem;margin-bottom:0.8rem;">🔐 账户设置</h3>';
-        html += '<button onclick="changeMyPassword()" class="outline" style="width:100%;margin-bottom:0.5rem;">🔑 修改密码</button>';
-        html += '<button onclick="clearMyData()" class="outline" style="width:100%;--pico-background-color:#e74c3c;--pico-border-color:#e74c3c;color:#e74c3c;">🗑️ 清空我的单词数据</button>';
+        html += '<div style="display:flex;gap:0.5rem;">';
+        html += '<button onclick="changeMyPassword()" class="outline" style="flex:1;">🔑 修改密码</button>';
+        html += '<button onclick="clearMyData()" style="flex:1;background:#e74c3c;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:0.85rem;padding:0.5rem;">🗑️ 删除</button>';
+        html += '</div>';
         html += '</div>';
         document.getElementById('rankContent').innerHTML = html;
     } catch(e) { document.getElementById('rankContent').innerHTML = '<p style="color:red;">加载失败: ' + e.message + '</p>'; }

@@ -98,9 +98,6 @@ body { padding-bottom: 3.5rem; }
         <span style="font-size:0.75rem;color:#888;white-space:nowrap;width:2rem;">词库</span>
         <select id="sourceFilter" style="flex:1;margin-bottom:0;font-size:0.8rem;height:44px;" onchange="onSourceChange()">
             <option value="">全部</option>
-            <option value="cet4">CET-4</option>
-            <option value="primary">小学</option>
-            <option value="import">自定义</option>
         </select>
     </div>
 </div>
@@ -114,15 +111,19 @@ body { padding-bottom: 3.5rem; }
 </div>
 <div class="page" id="pageWords"><div id="wordList"></div></div>
 <div class="page" id="pageStats"><div id="statsContent"></div></div>
-<div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button><button onclick="resetCurve()" class="outline" style="margin-left:0.5rem;">恢复默认</button></div>
-<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">每行一个单词，格式：英文，中文释义（音标、例句可选），清空后粘贴你自己的词库</p><div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;"><span style="font-size:0.85rem;color:#888;">词库标签</span><select id="importSource" style="display:inline;width:auto;margin-bottom:0;font-size:0.85rem;"><option value="import">自定义</option><option value="cet4">CET-4</option><option value="primary">小学</option></select></div><textarea id="importText" rows="6" placeholder="apple, 苹果, /ˈæp.əl/&#10;book, 书本, /bʊk/&#10;cat, 猫, /kæt/, The cat is sleeping., 猫在睡觉。"></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><button onclick="loadPrimary()" class="outline">🏫 小学词库</button><button onclick="exportWords()" class="outline">📤 导出备份</button></div>
+<div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button><button onclick="resetCurve()" class="outline" style="margin-left:0.5rem;">恢复默认</button><p style="margin-top:0.8rem;text-align:center;"><a href="javascript:showPage('pageRules')" style="font-size:0.8rem;color:#0066cc;">📖 遗忘曲线规则详解</a></p></div>
+<div class="page" id="pageRules"><h3>📖 遗忘曲线规则</h3><div id="rulesContent"></div></div>
+<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">每行一个单词，格式：英文，中文释义（音标、例句可选），清空后粘贴你自己的词库</p><div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;"><span style="font-size:0.85rem;color:#888;">词库标签</span><select id="importSource" style="display:inline;width:auto;margin-bottom:0;font-size:0.85rem;"><option value="import">自定义</option><option value="cet4">CET-4</option><option value="grade_g3a">三年级上册</option><option value="grade_g3b">三年级下册</option><option value="grade_g4a">四年级上册</option><option value="grade_g4b">四年级下册</option><option value="grade_g5a">五年级上册</option><option value="grade_g5b">五年级下册</option><option value="grade_g6a">六年级上册</option><option value="grade_g6b">六年级下册</option></select></div><textarea id="importText" rows="6" placeholder="apple, 苹果, /ˈæp.əl/&#10;book, 书本, /bʊk/&#10;cat, 猫, /kæt/, The cat is sleeping., 猫在睡觉。"></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;"><button onclick="loadGrade('g3a','三年级上册')" class="outline">📗 三年级上册</button><button onclick="loadGrade('g3b','三年级下册')" class="outline">📗 三年级下册</button><button onclick="loadGrade('g4a','四年级上册')" class="outline">📘 四年级上册</button><button onclick="loadGrade('g4b','四年级下册')" class="outline">📘 四年级下册</button><button onclick="loadGrade('g5a','五年级上册')" class="outline">📙 五年级上册</button><button onclick="loadGrade('g5b','五年级下册')" class="outline">📙 五年级下册</button><button onclick="loadGrade('g6a','六年级上册')" class="outline">📕 六年级上册</button><button onclick="loadGrade('g6b','六年级下册')" class="outline">📕 六年级下册</button></div><button onclick="exportWords()" class="outline" style="margin-top:0.5rem;">📤 导出备份</button></div>
+<div class="page" id="pageRank"><h3>🏆 排行榜</h3><div id="rankContent"></div></div>
 <div class="page" id="pageAdmin"><h3>👑 管理面板</h3><div id="adminContent"></div></div>
 <!-- 底部导航（全局固定，不在任何.page内部） -->
 <div class="bottom-nav">
     <button onclick="showPage('pageHome')" class="bnav" id="bnavHome">首页</button>
     <button onclick="showPage('pageWords')" class="bnav" id="bnavWords">词库</button>
     <button onclick="showPage('pageStats')" class="bnav" id="bnavStats">统计</button>
+    <button onclick="showPage('pageRank')" class="bnav" id="bnavRank">排行</button>
     <button onclick="showPage('pageCurve')" class="bnav" id="bnavCurve">曲线</button>
+    <button onclick="showPage('pageRules')" class="bnav" id="bnavRules">规则</button>
     <button onclick="showPage('pageImport')" class="bnav" id="bnavImport">导入</button>
     <button onclick="showPage('pageAdmin')" class="bnav" id="bnavAdmin" style="display:none;">管理</button>
 </div>
@@ -214,20 +215,22 @@ function calcNextTime(stage, result) {
 }
 
 // ============ 状态 ============
-let state = {mode:'mix', dailyLimit:100, words:[], todayDate:'', todayStudied:0, todayReviewed:0, _wordsLoaded:false, currentSource:''};
+let state = {mode:'mix', dailyLimit:100, words:[], todayDate:'', todayStudied:0, todayReviewed:0, _wordsLoaded:false, currentSource:'', reviewDeduct:false};
 
 function loadState() {
     try {
         const s = JSON.parse(localStorage.getItem('recite_state'));
         if (s) { state.todayDate=s.todayDate||''; state.todayStudied=s.todayStudied||0;
-            state.todayReviewed=s.todayReviewed||0; state.dailyLimit=s.dailyLimit||100; state.mode=s.mode||'mix'; }
+            state.todayReviewed=s.todayReviewed||0; state.dailyLimit=s.dailyLimit||100; state.mode=s.mode||'mix';
+            state.reviewDeduct = s.reviewDeduct || false; }
     } catch(e) {}
 }
 
 function saveState() {
     localStorage.setItem('recite_state', JSON.stringify({
         todayDate:state.todayDate, todayStudied:state.todayStudied,
-        todayReviewed:state.todayReviewed, dailyLimit:state.dailyLimit, mode:state.mode
+        todayReviewed:state.todayReviewed, dailyLimit:state.dailyLimit, mode:state.mode,
+        reviewDeduct:state.reviewDeduct
     }));
 }
 
@@ -235,6 +238,42 @@ function saveState() {
 function getFilteredWords() {
     if (!state.currentSource) return state.words;
     return state.words.filter(w => w.source === state.currentSource);
+}
+
+// 词库源 → 显示名映射
+var SOURCE_LABELS = {
+    'cet4': 'CET-4', 'import': '自定义',
+    'grade_g3a': '三年级上册', 'grade_g3b': '三年级下册',
+    'grade_g4a': '四年级上册', 'grade_g4b': '四年级下册',
+    'grade_g5a': '五年级上册', 'grade_g5b': '五年级下册',
+    'grade_g6a': '六年级上册', 'grade_g6b': '六年级下册',
+};
+
+// 根据 state.words 动态更新词库筛选器（只显示用户已导入的词库）
+function updateSourceFilter() {
+    var sel = document.getElementById('sourceFilter');
+    var currentVal = sel.value;
+    // 收集用户已有的词库
+    var sources = {};
+    for (var i=0;i<state.words.length;i++) {
+        var src = state.words[i].source;
+        if (src) sources[src] = (sources[src]||0) + 1;
+    }
+    // 重建选项（保留「全部」）
+    sel.innerHTML = '<option value="">全部</option>';
+    var keys = Object.keys(sources).sort();
+    for (var j=0;j<keys.length;j++) {
+        var k = keys[j];
+        var label = SOURCE_LABELS[k] || k;
+        var opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = label + '（' + sources[k] + '词）';
+        sel.appendChild(opt);
+    }
+    // 恢复选中值
+    if (currentVal && sources[currentVal]) sel.value = currentVal;
+    else sel.value = '';
+    state.currentSource = sel.value;
 }
 
 function onSourceChange() {
@@ -265,6 +304,7 @@ async function loadWords(force) {
                 getAllWords().then(function(fresh){
                     if (fresh && fresh.length > 0) {
                         state.words = fresh;
+                        updateSourceFilter();
                         try { localStorage.setItem('recite_words_cache', JSON.stringify({words:fresh, time:Date.now()})); } catch(e){}
                         // 如果首页可见，刷新统计
                         if (document.getElementById('pageHome').classList.contains('active')) updateStats();
@@ -279,6 +319,7 @@ async function loadWords(force) {
     if (fresh && fresh.length > 0 || !state._wordsLoaded) {
         state.words = fresh;
         state._wordsLoaded = true;
+        updateSourceFilter();
         try { localStorage.setItem('recite_words_cache', JSON.stringify({words:fresh, time:Date.now()})); } catch(e){}
     }
 }
@@ -297,9 +338,10 @@ async function refreshStats() {
     let review = words.filter(w => w.status==='learning' && w.next_time && w.next_time <= now);
     let newW = words.filter(w => w.status==='new' || !w.status);
     let mastered = words.filter(w => w.status==='mastered');
-    let remaining = Math.max(0, state.dailyLimit - state.todayStudied);
+    var consumed = state.todayStudied + (state.reviewDeduct ? state.todayReviewed : 0);
+    let remaining = Math.max(0, state.dailyLimit - consumed);
     document.getElementById('statReview').textContent = review.length;
-    document.getElementById('statNew').textContent = Math.min(remaining, newW.length);
+    document.getElementById('statNew').textContent = remaining + '/' + newW.length;
     document.getElementById('statMastered').textContent = mastered.length;
     document.getElementById('dailyLimit').value = state.dailyLimit;
     renderHome(review, newW);
@@ -316,7 +358,9 @@ function showPage(id) {
     if (id==='pageWords') renderWordList();
     if (id==='pageStats') renderStatsPage();
     if (id==='pageHome') refreshStats();
+    if (id==='pageRank') renderRank();
     if (id==='pageAdmin') renderAdmin();
+    if (id==='pageRules') renderRules();
     if (id==='pageCurve') { _curveLoaded=false; renderCurveSettings(); }
 }
 
@@ -327,9 +371,10 @@ function updateStats() {
     var review = words.filter(function(w) { return w.status==='learning' && w.next_time && w.next_time <= now; }).length;
     var newW = words.filter(function(w) { return w.status==='new' || !w.status; }).length;
     var mastered = words.filter(function(w) { return w.status==='mastered'; }).length;
-    var remaining = Math.max(0, state.dailyLimit - state.todayStudied);
     document.getElementById('statReview').textContent = review;
-    document.getElementById('statNew').textContent = Math.min(remaining, newW);
+    var consumed = state.todayStudied + (state.reviewDeduct ? state.todayReviewed : 0);
+    var rem = Math.max(0, state.dailyLimit - consumed);
+    document.getElementById('statNew').textContent = rem + '/' + newW;
     document.getElementById('statMastered').textContent = mastered;
 }
 
@@ -338,7 +383,9 @@ let currentWords=[], currentIndex=0, isReview=false;
 
 function renderHome(review, newW) {
     const mode = state.mode;
-    const remaining = state.dailyLimit - state.todayStudied;
+    // reviewDeduct=true 时复习也占用每日名额
+    var consumed = state.todayStudied + (state.reviewDeduct ? state.todayReviewed : 0);
+    var remaining = Math.max(0, state.dailyLimit - consumed);
     let list=[], rv=false;
     if (mode==='review') { list=review; rv=true; }
     else if (mode==='new') { list=newW.slice(0,Math.max(0,remaining)); rv=false; }
@@ -505,23 +552,264 @@ async function renderAdmin() {
         var r = await fetch('/api/admin/users', {headers:{'Content-Type':'application/json', 'X-Phone': localStorage.getItem('phone')||''}});
         var data = await r.json();
         if (!data.ok) { document.getElementById('adminContent').innerHTML = '<p style="color:red;">'+data.msg+'</p>'; return; }
+        var users = data.users;
         var html = '<div style="background:white;border-radius:12px;padding:1rem;box-shadow:0 1px 4px rgba(0,0,0,0.06);">';
-        html += '<p style="font-size:0.85rem;color:#888;margin-bottom:0.8rem;">共 ' + data.users.length + ' 个用户</p>';
-        for (var i=0;i<data.users.length;i++) {
-            var u = data.users[i];
-            html += '<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #eee;">';
-            html += '<span>' + u.phone + (u.is_admin?' 👑':'') + '</span>';
-            html += '<span style="color:#888;font-size:0.85rem;">已掌握 ' + (u.mastered||0) + ' 词</span>';
+        html += '<p style="font-size:0.85rem;color:#888;margin-bottom:0.8rem;">🏆 排行榜 — 共 ' + users.length + ' 个用户</p>';
+        var medals = ['🥇', '🥈', '🥉'];
+        for (var i=0;i<users.length;i++) {
+            var u = users[i];
+            var rank = i + 1;
+            var shortPhone = u.phone.slice(-4);
+            var icon = rank <= 3 ? medals[rank-1] : rank + '.';
+            var honor = rank === 1 ? 'background:linear-gradient(135deg,#fff9c4,#fff176);border-radius:10px;margin:-0.3rem -0.5rem;padding:0.3rem 0.5rem;' : '';
+            html += '<div style="display:flex;align-items:center;gap:0.3rem;padding:0.5rem 0;border-bottom:1px solid #eee;' + honor + '">';
+            html += '<span style="font-size:1.1rem;min-width:1.8rem;text-align:center;">' + icon + '</span>';
+            html += '<span style="font-weight:600;font-size:0.85rem;">****' + shortPhone + '</span>';
+            if (u.is_admin) html += '<span style="font-size:0.65rem;color:#f39c12;background:#fef3e2;padding:0.05rem 0.4rem;border-radius:6px;">管理员</span>';
+            html += '<span style="flex:1;text-align:right;color:#0066cc;font-weight:700;font-size:0.85rem;">' + (u.mastered||0) + '词</span>';
+            html += '<span style="color:#999;font-size:0.7rem;">/共' + (u.word_count||0) + '</span>';
+            html += '<button onclick="adminResetPw(\'' + u.phone + '\')" class="outline" style="padding:0.1rem 0.4rem;font-size:0.65rem;height:28px;margin:0;min-width:auto;">🔑</button>';
             html += '</div>';
         }
         html += '</div>';
+        // 管理员清除用户数据
         html += '<div style="margin-top:1rem;padding-top:1rem;border-top:2px solid #eee;">';
-        html += '<button onclick="clearMyData()" class="outline" style="--pico-background-color:#e74c3c;--pico-border-color:#e74c3c;color:#e74c3c;">🗑️ 清空我的单词数据</button>';
-        html += '<p style="font-size:0.75rem;color:#999;margin-top:0.5rem;">清空当前账号所有单词（不含其他用户）</p>';
+        html += '<div style="display:flex;gap:0.4rem;align-items:center;">';
+        html += '<select id="clearUserSelect" style="flex:1;margin-bottom:0;font-size:0.85rem;height:44px;">';
+        html += '<option value="">— 选择要清空的用户 —</option>';
+        for (var j=0;j<users.length;j++) {
+            var uu = users[j];
+            html += '<option value="' + uu.phone + '">****' + uu.phone.slice(-4) + '（' + (uu.mastered||0) + '词/共' + (uu.word_count||0) + '）</option>';
+        }
+        html += '</select>';
+        html += '<button onclick="adminClearUser()" class="outline" style="--pico-background-color:#e74c3c;--pico-border-color:#e74c3c;color:#e74c3c;white-space:nowrap;height:44px;">🗑️ 清空</button>';
+        html += '</div>';
+        html += '<p style="font-size:0.75rem;color:#999;margin-top:0.5rem;">选择用户后点清空，不可恢复</p>';
         html += '</div>';
         document.getElementById('adminContent').innerHTML = html;
     } catch(e) { document.getElementById('adminContent').innerHTML = '<p style="color:red;">加载失败: ' + e.message + '</p>'; }
 };
+
+// ============ 遗忘曲线规则页 ============
+function renderRules() {
+    var html = '<div style="background:white;border-radius:12px;padding:1rem;box-shadow:0 1px 4px rgba(0,0,0,0.06);">';
+    html += '<h3 style="font-size:1rem;margin-bottom:0.8rem;">🎯 三段式复习</h3>';
+    html += '<p style="font-size:0.85rem;color:#555;line-height:1.7;margin-bottom:1rem;">每张单词卡片有三种操作：</p>';
+    html += '<div style="display:flex;gap:0.4rem;margin-bottom:1rem;">';
+    html += '<div style="flex:1;background:#fff5f5;border-radius:10px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;">❌</div><div style="font-size:0.8rem;font-weight:600;color:#e74c3c;">忘记</div><div style="font-size:0.7rem;color:#888;">归零重学</div></div>';
+    html += '<div style="flex:1;background:#fff8e1;border-radius:10px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;">🔄</div><div style="font-size:0.8rem;font-weight:600;color:#f39c12;">模糊</div><div style="font-size:0.7rem;color:#888;">降阶减半</div></div>';
+    html += '<div style="flex:1;background:#f0fff4;border-radius:10px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;">✅</div><div style="font-size:0.8rem;font-weight:600;color:#27ae60;">记住</div><div style="font-size:0.7rem;color:#888;">升阶</div></div>';
+    html += '</div>';
+    html += '<h3 style="font-size:1rem;margin-bottom:0.5rem;">📊 六阶段间隔</h3>';
+    html += '<table style="width:100%;font-size:0.85rem;border-collapse:collapse;margin-bottom:1rem;">';
+    html += '<tr style="background:#f5f7fb;"><th style="padding:0.4rem;text-align:left;border-bottom:1px solid #eee;">阶段</th><th style="padding:0.4rem;text-align:left;border-bottom:1px solid #eee;">默认间隔</th><th style="padding:0.4rem;text-align:left;border-bottom:1px solid #eee;">说明</th></tr>';
+    var stages = [
+        ['T0', '0', '刚学，首次出现'],
+        ['T1', '1 小时', '点「记住」升到 T2'],
+        ['T2', '1 天', '模糊降回 T1，间隔减半→0.5天'],
+        ['T3', '3 天', ''],
+        ['T4', '7 天', ''],
+        ['T5', '30 天', '✅ 达到「已掌握」'],
+    ];
+    for (var i=0;i<stages.length;i++) {
+        var s = stages[i];
+        html += '<tr><td style="padding:0.4rem;border-bottom:1px solid #eee;font-weight:600;">' + s[0] + '</td><td style="padding:0.4rem;border-bottom:1px solid #eee;">' + s[1] + '</td><td style="padding:0.4rem;border-bottom:1px solid #eee;color:#666;">' + s[2] + '</td></tr>';
+    }
+    html += '</table>';
+    html += '<h3 style="font-size:1rem;margin-bottom:0.5rem;">📝 举例</h3>';
+    html += '<div style="background:#f0f7ff;border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">';
+    html += '<p style="font-size:0.85rem;font-weight:600;margin-bottom:0.3rem;">场景：你在 T3（间隔3天）点了「模糊」</p>';
+    html += '<p style="font-size:0.8rem;color:#555;line-height:1.6;">① <b>降阶</b>：T3 → T2<br>② <b>减半</b>：T2 默认间隔 1天 × 0.5 = <b>0.5天（12小时）</b>后复习</p>';
+    html += '</div>';
+    html += '<div style="background:#f0f7ff;border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">';
+    html += '<p style="font-size:0.85rem;font-weight:600;margin-bottom:0.3rem;">场景：你在 T1 点了「记住」</p>';
+    html += '<p style="font-size:0.8rem;color:#555;line-height:1.6;">① <b>升阶</b>：T1 → T2<br>② <b>正常间隔</b>：T2 默认 1天后复习</p>';
+    html += '</div>';
+    html += '<div style="background:#f0f7ff;border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">';
+    html += '<p style="font-size:0.85rem;font-weight:600;margin-bottom:0.3rem;">场景：你在 T4 点了「忘记」</p>';
+    html += '<p style="font-size:0.8rem;color:#555;line-height:1.6;">① <b>归零</b>：回到 T0<br>② <b>立即重学</b>：30秒后再次出现</p>';
+    html += '</div>';
+    var reviewDeduct = state.reviewDeduct || false;
+    html += '<h3 style="font-size:1rem;margin-bottom:0.5rem;">📅 每日配额</h3>';
+    html += '<div style="background:#e8f4fd;border-radius:10px;padding:0.8rem;margin-bottom:0.8rem;">';
+    html += '<p style="font-size:0.85rem;line-height:1.6;">每日上限 <b>100</b> = 复习 <b>5</b> + 新学 <b>' + (reviewDeduct ? '95' : '100') + '</b></p>';
+    html += '<p style="font-size:0.8rem;color:#555;line-height:1.5;">' + (reviewDeduct ? '复习也占用每日名额，学满后今日不再出现新词和复习。' : '复习不占用每日名额，新词学满后今日不再出现新词，但复习不受限。') + '</p>';
+    html += '<label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;padding:0.5rem;background:white;border-radius:8px;cursor:pointer;">';
+    html += '<input type="checkbox" id="reviewDeductToggle" onchange="toggleReviewDeduct()" ' + (reviewDeduct ? 'checked' : '') + ' style="width:18px;height:18px;">';
+    html += '<span style="font-size:0.85rem;">复习也占用每日名额（100 = 复习5 + 新学95）</span>';
+    html += '</label>';
+    html += '</div>';
+    html += '<h3 style="font-size:1rem;margin-bottom:0.5rem;">⚙️ 自定义间隔</h3>';
+    html += '<p style="font-size:0.8rem;color:#666;line-height:1.6;">在「曲线」页面可修改 T1~T5 的间隔天数，保存后即时生效。<a href="javascript:showPage(\'pageCurve\')" style="color:#0066cc;">去设置 →</a></p>';
+    html += '</div>';
+    document.getElementById('rulesContent').innerHTML = html;
+}
+
+// 切换复习是否占用每日名额
+function toggleReviewDeduct() {
+    state.reviewDeduct = document.getElementById('reviewDeductToggle').checked;
+    saveState();
+    renderRules();
+}
+
+// ============ 排行榜（公开） ============
+async function renderRank() {
+    document.getElementById('rankContent').innerHTML = '<p style="color:#888;">加载中...</p>';
+    try {
+        var r = await fetch('/api/leaderboard');
+        var data = await r.json();
+        if (!data.ok) { document.getElementById('rankContent').innerHTML = '<p style="color:red;">'+data.msg+'</p>'; return; }
+        var users = data.users;
+        var html = '<div style="background:white;border-radius:12px;padding:1rem;box-shadow:0 1px 4px rgba(0,0,0,0.06);">';
+        html += '<p style="font-size:0.85rem;color:#888;margin-bottom:0.8rem;">共 ' + users.length + ' 位同学</p>';
+        var medals = ['🥇', '🥈', '🥉'];
+        for (var i=0;i<users.length;i++) {
+            var u = users[i];
+            var rank = i + 1;
+            var icon = rank <= 3 ? medals[rank-1] : rank + '.';
+            var isMe = u.phone === localStorage.getItem('phone');
+            var bg = rank === 1 ? 'background:linear-gradient(135deg,#fff9c4,#fff176);' : (isMe ? 'background:#e8f4fd;' : '');
+            html += '<div style="display:flex;align-items:center;gap:0.3rem;padding:0.5rem 0;border-bottom:1px solid #eee;' + bg + 'border-radius:8px;margin-bottom:2px;">';
+            html += '<span style="font-size:1.1rem;min-width:1.8rem;text-align:center;">' + icon + '</span>';
+            html += '<span style="font-weight:600;font-size:0.85rem;">****' + u.phone.slice(-4) + '</span>';
+            html += '<span style="flex:1;text-align:right;color:#0066cc;font-weight:700;font-size:0.85rem;">' + (u.mastered||0) + '词</span>';
+            html += '<span style="color:#999;font-size:0.7rem;">/共' + (u.word_count||0) + '</span>';
+            html += '</div>';
+        }
+        html += '</div>';
+        // 个人设置区
+        html += '<div style="margin-top:1rem;padding-top:1rem;border-top:2px solid #eee;">';
+        html += '<h3 style="font-size:0.9rem;margin-bottom:0.8rem;">🔐 账户设置</h3>';
+        html += '<button onclick="changeMyPassword()" class="outline" style="width:100%;margin-bottom:0.5rem;">🔑 修改密码</button>';
+        html += '<button onclick="clearMyData()" class="outline" style="width:100%;--pico-background-color:#e74c3c;--pico-border-color:#e74c3c;color:#e74c3c;">🗑️ 清空我的单词数据</button>';
+        html += '</div>';
+        document.getElementById('rankContent').innerHTML = html;
+    } catch(e) { document.getElementById('rankContent').innerHTML = '<p style="color:red;">加载失败: ' + e.message + '</p>'; }
+}
+
+function changeMyPassword() {
+    showPrompt('输入旧密码：', function(oldPw) {
+        if (!oldPw) return;
+        showPrompt('输入新密码（至少8位，需含字母和数字）：', function(newPw) {
+            if (!newPw || newPw.length < 8) { showModal('密码至少8位'); return; }
+            if (!/[a-zA-Z]/.test(newPw) || !/[0-9]/.test(newPw)) { showModal('密码需包含字母和数字'); return; }
+            fetch('/api/change-password', {
+                method:'POST',
+                headers:{'Content-Type':'application/json', 'X-Phone': localStorage.getItem('phone')||''},
+                body: JSON.stringify({old_password:oldPw, new_password:newPw})
+            }).then(function(r){ return r.json(); }).then(function(data){
+                showModal(data.msg || (data.ok ? '密码已修改' : '失败'));
+            }).catch(function(e){ showModal('失败: '+e.message); });
+        });
+    });
+}
+
+function adminResetPw(phone) {
+    showPrompt('为 ****' + phone.slice(-4) + ' 设置新密码（至少8位，需含字母和数字）：', function(newPw) {
+        if (!newPw || newPw.length < 8) { showModal('密码至少8位'); return; }
+        fetch('/api/admin/reset-password', {
+            method:'POST',
+            headers:{'Content-Type':'application/json', 'X-Phone': localStorage.getItem('phone')||''},
+            body: JSON.stringify({phone:phone, password:newPw})
+        }).then(function(r){ return r.json(); }).then(function(data){
+            showModal(data.msg || (data.ok ? '已重置' : '失败'));
+            renderAdmin();
+        }).catch(function(e){ showModal('失败: '+e.message); });
+    });
+}
+
+// 带输入框的弹窗（复用统一弹窗样式）
+function showPrompt(msg, onOk) {
+    var modal = document.getElementById('myModal');
+    var msgEl = document.getElementById('modalMsg');
+    var btns = document.querySelectorAll('#modalBtns button');
+    // 建输入框
+    var input = document.createElement('input');
+    input.type = 'password';
+    input.placeholder = '输入新密码';
+    input.style.cssText = 'width:100%;padding:0.6rem;border:1px solid #ddd;border-radius:10px;font-size:1rem;margin-bottom:1rem;box-sizing:border-box;text-align:center;';
+    input.id = 'promptInput';
+    // 替换内容
+    msgEl.textContent = msg;
+    msgEl.after(input);
+    if (btns.length >= 2) { btns[0].style.display = 'inline-block'; btns[1].style.display = 'inline-block'; }
+    btns[0].textContent = '确定';
+    btns[1].textContent = '取消';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    window._promptCallback = onOk;
+    window._modalCallback = null;
+    window._confirmCallback = null;
+    modal.removeAttribute('data-cb');
+    setTimeout(function(){ input.focus(); }, 100);
+    // 回车确认
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('promptInput').remove();
+            modal.style.display = 'none';
+            restorePromptBtns();
+            if (window._promptCallback) {
+                var cb = window._promptCallback;
+                window._promptCallback = null;
+                setTimeout(function(){ cb(input.value); }, 50);
+            }
+        }
+    };
+    // 覆盖确认按钮
+    // 保存原 handler 用于恢复
+    var origOk = btns[0].onclick;
+    var origCancel = btns[1].onclick;
+    btns[0].onclick = function() {
+        var inputEl = document.getElementById('promptInput');
+        if (!inputEl) return;
+        var val = inputEl.value;
+        inputEl.remove();
+        modal.style.display = 'none';
+        restorePromptBtns();
+        if (window._promptCallback) {
+            var cb = window._promptCallback;
+            window._promptCallback = null;
+            setTimeout(function(){ cb(val); }, 50);
+        }
+    };
+    btns[1].onclick = function() {
+        var inputEl = document.getElementById('promptInput');
+        if (inputEl) inputEl.remove();
+        modal.style.display = 'none';
+        restorePromptBtns();
+        window._promptCallback = null;
+    };
+    function restorePromptBtns() {
+        btns[0].onclick = origOk;
+        btns[1].onclick = origCancel;
+    }
+    // 关闭弹窗时也恢复
+    var origClose = modal.onclick;
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            var inp = document.getElementById('promptInput');
+            if (inp) inp.remove();
+            restorePromptBtns();
+            modal.style.display = 'none';
+            window._promptCallback = null;
+        }
+    };
+}
+function adminClearUser() {
+    var sel = document.getElementById('clearUserSelect');
+    var phone = sel.value;
+    if (!phone) { showModal('请先选择用户'); return; }
+    showConfirm('确定清空 ****' + phone.slice(-4) + ' 的所有单词数据？不可恢复！', async function(){
+        try {
+            var r = await fetch('/api/admin/clear-user?phone=' + encodeURIComponent(phone), {method:'DELETE', headers:{'X-Phone': localStorage.getItem('phone')||''}});
+            var data = await r.json();
+            showModal(data.msg || (data.ok ? '已清空' : '失败'));
+            renderAdmin();
+        } catch(e) { showModal('失败: '+e.message); }
+    });
+}
+
 async function clearMyData() {
     showConfirm('确定清空你所有单词数据？此操作不可恢复！', async function(){
         try {
@@ -547,6 +835,10 @@ async function switchSource(src) {
     document.getElementById('sourceFilter').value = src;
     localStorage.setItem('recite_source', src);
     state._wordsLoaded = false;
+    // 切换词库时重置今日计数，避免旧词库的复习量影响新词库
+    state.todayStudied = 0;
+    state.todayReviewed = 0;
+    saveState();
     await refreshStats();
     var active = document.querySelector('.page.active');
     if (active && active.id !== 'pageHome') showPage(active.id);
@@ -593,12 +885,12 @@ async function loadCET4() {
             if (p.length<2 || !p[0]) continue;
             list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
         }
-        // 跳过已存在的词（避免覆盖其他词库的同名词）
-        await loadWords(true);
-        var existing = new Set(state.words.map(function(w){ return w.word; }));
-        var list2 = list.filter(function(w){ return !existing.has(w.word); }).map(function(w){ return Object.assign(w, {source:'cet4'}); });
+        // 先清空 CET-4 词库，再全量导入
+        await api('DELETE', '/words/source/cet4');
+        var list2 = list.map(function(w){ return Object.assign(w, {source:'cet4'}); });
         if (list2.length > 0) await saveWords(list2);
-        showModal('加载 ' + list2.length + ' 个新 CET-4 单词（跳过 ' + (list.length - list2.length) + ' 个已有词）');
+        showModal('加载 ' + list2.length + ' 个 CET-4 单词');
+        updateSourceFilter();
         await loadWords(true);
         switchSource('cet4');
     } catch(e) { showModal('加载失败: '+e.message); }
@@ -625,6 +917,46 @@ async function loadPrimary() {
         await loadWords(true);
         switchSource('primary');
     } catch(e) { showModal('加载失败: '+e.message); }
+}
+
+// ============ 年级词库加载 ============
+async function loadGrade(shortName, displayName) {
+    try {
+        const resp = await fetch('grade_' + shortName + '.csv');
+        const text = await resp.text();
+        const lines = text.split('\n').filter(l=>l.trim());
+        const list = [];
+        for (const line of lines) {
+            if (line.startsWith('word,meaning')) continue;
+            const p = parseCSVLine(line);
+            if (p.length<2 || !p[0]) continue;
+            list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new'});
+        }
+        const source = 'grade_' + shortName;
+        // 先清空该词库已有数据，实现词库独立
+        await api('DELETE', '/words/source/' + encodeURIComponent(source));
+        var list2 = list.map(function(w){ return Object.assign(w, {source:source}); });
+        if (list2.length > 0) await saveWords(list2);
+        showModal('加载 ' + list2.length + ' 个' + displayName + '单词');
+        updateSourceFilter();
+        await loadWords(true);
+        switchSource(source);
+    } catch(e) { showModal('加载失败: '+e.message); }
+}
+
+// 用简单的 CSV 行解析（处理带逗号的问题）
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQuote = !inQuote; continue; }
+        if (ch === ',' && !inQuote) { result.push(current); current = ''; continue; }
+        current += ch;
+    }
+    result.push(current);
+    return result;
 }
 
 // ============ 遗忘曲线设置 ============
@@ -1101,10 +1433,22 @@ if (phone) {
     document.getElementById('dailyLimit').addEventListener('input', e => { state.dailyLimit=parseInt(e.target.value)||100; updateStats(); if (document.getElementById('pageHome').classList.contains('active')) refreshStats(); });
     document.getElementById('dailyLimit').addEventListener('change', e => { state.dailyLimit=parseInt(e.target.value)||100; saveState(); refreshStats(); });
     document.getElementById('modeSelect').addEventListener('change', e => { state.mode=e.target.value; saveState(); refreshStats(); });
-    // 管理员显示管理按钮
-    if (localStorage.getItem('is_admin') === '1') {
-        document.getElementById('bnavAdmin').style.display = 'inline';
-    }
+    // 从服务器验证管理员身份
+    (function checkAdmin() {
+        var phone = localStorage.getItem('phone');
+        if (phone) {
+            fetch('/api/me', {headers:{'X-Phone': phone}})
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    if (d.ok && d.is_admin) {
+                        localStorage.setItem('is_admin', '1');
+                        document.getElementById('bnavAdmin').style.display = 'inline';
+                    } else {
+                        localStorage.removeItem('is_admin');
+                    }
+                }).catch(function(){});
+        }
+    })();
     refreshStats();
     // URL参数 ?test=1 自动跑自测
     if (window.location.search.indexOf('test=1') !== -1) {

@@ -68,6 +68,16 @@ def login():
     if row['pw'] != hash_pw(pw): return jsonify({'ok':False,'msg':'密码错误'})
     return jsonify({'ok':True, 'token': make_token(phone), 'phone': phone, 'is_admin': bool(row['is_admin'])})
 
+@app.route('/api/me', methods=['GET'])
+def get_me():
+    """当前用户信息"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    db = get_db()
+    row = db.execute('SELECT phone, is_admin FROM users WHERE phone=?', (phone,)).fetchone()
+    if not row: return jsonify({'ok':False,'msg':'用户不存在'})
+    return jsonify({'ok':True, 'phone': row['phone'], 'is_admin': bool(row['is_admin'])})
+
 @app.route('/api/words', methods=['GET','POST','PUT'])
 def words():
     phone = request.headers.get('X-Phone','')
@@ -82,7 +92,7 @@ def words():
         data = request.json  # list of words
         count = 0
         for w in (data if isinstance(data, list) else [data]):
-            db.execute('''INSERT OR IGNORE INTO words
+            db.execute('''INSERT OR REPLACE INTO words
                 (phone, word, meaning, phonetic, example, example_cn, stage, next_time, last_time, status, fail_count, source)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (phone, w['word'], w.get('meaning',''), w.get('phonetic',''),
@@ -110,6 +120,30 @@ def clear_words():
     db.execute('DELETE FROM words WHERE phone=?', (phone,))
     db.commit()
     return jsonify({'ok':True, 'msg':'已清空'})
+
+@app.route('/api/admin/clear-user', methods=['DELETE'])
+def admin_clear_user():
+    """管理员清空指定用户的单词数据"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    db = get_db()
+    admin = db.execute('SELECT is_admin FROM users WHERE phone=?', (phone,)).fetchone()
+    if not admin or not admin['is_admin']: return jsonify({'ok':False,'msg':'无权限'})
+    target = request.args.get('phone', '')
+    if not target: return jsonify({'ok':False,'msg':'参数不全'})
+    db.execute('DELETE FROM words WHERE phone=?', (target,))
+    db.commit()
+    return jsonify({'ok':True, 'msg':f'已清空 {target} 的单词数据'})
+
+@app.route('/api/words/source/<source_name>', methods=['DELETE'])
+def delete_words_by_source(source_name):
+    """按词库清空单词"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    db = get_db()
+    db.execute('DELETE FROM words WHERE phone=? AND source=?', (phone, source_name))
+    db.commit()
+    return jsonify({'ok':True, 'msg':'已清空词库 '+source_name})
 
 @app.route('/api/words/<word>', methods=['DELETE'])
 def delete_word(word):
@@ -167,6 +201,59 @@ def admin_users():
     result = [{'phone': r['phone'], 'is_admin': bool(r['is_admin']),
                'word_count': r['total'], 'mastered': r['mastered']} for r in rows]
     return jsonify({'ok':True, 'users': result})
+
+@app.route('/api/admin/reset-password', methods=['POST'])
+def admin_reset_password():
+    """管理员重置用户密码"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    db = get_db()
+    admin = db.execute('SELECT is_admin FROM users WHERE phone=?', (phone,)).fetchone()
+    if not admin or not admin['is_admin']: return jsonify({'ok':False,'msg':'无权限'})
+    data = request.json
+    target = data.get('phone','')
+    new_pw = data.get('password','')
+    if not target or not new_pw: return jsonify({'ok':False,'msg':'参数不全'})
+    if len(new_pw) < 8: return jsonify({'ok':False,'msg':'密码至少8位'})
+    if not re.search(r'[a-zA-Z]', new_pw) or not re.search(r'[0-9]', new_pw):
+        return jsonify({'ok':False,'msg':'密码需包含字母和数字'})
+    db.execute('UPDATE users SET pw=? WHERE phone=?', (hash_pw(new_pw), target))
+    db.commit()
+    return jsonify({'ok':True, 'msg':f'已重置{target}的密码'})
+
+# ============ 公共 ============
+
+@app.route('/api/leaderboard', methods=['GET'])
+def leaderboard():
+    """公开排行榜（所有用户可见）"""
+    db = get_db()
+    rows = db.execute('''SELECT u.phone,
+        COUNT(w.id) as total,
+        SUM(CASE WHEN w.status='mastered' THEN 1 ELSE 0 END) as mastered
+        FROM users u LEFT JOIN words w ON u.phone=w.phone
+        GROUP BY u.phone ORDER BY mastered DESC, total DESC''').fetchall()
+    result = [{'phone': r['phone'], 'word_count': r['total'], 'mastered': r['mastered']} for r in rows]
+    return jsonify({'ok':True, 'users': result})
+
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    """用户自行修改密码"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    data = request.json
+    old_pw = data.get('old_password','')
+    new_pw = data.get('new_password','')
+    if not old_pw or not new_pw: return jsonify({'ok':False,'msg':'参数不全'})
+    db = get_db()
+    row = db.execute('SELECT pw FROM users WHERE phone=?', (phone,)).fetchone()
+    if not row: return jsonify({'ok':False,'msg':'用户不存在'})
+    if row['pw'] != hash_pw(old_pw): return jsonify({'ok':False,'msg':'旧密码错误'})
+    if len(new_pw) < 8: return jsonify({'ok':False,'msg':'密码至少8位'})
+    if not re.search(r'[a-zA-Z]', new_pw) or not re.search(r'[0-9]', new_pw):
+        return jsonify({'ok':False,'msg':'密码需包含字母和数字'})
+    db.execute('UPDATE users SET pw=? WHERE phone=?', (hash_pw(new_pw), phone))
+    db.commit()
+    return jsonify({'ok':True, 'msg':'密码已修改'})
 
 if __name__ == '__main__':
     print(f'启动: http://localhost:5000')

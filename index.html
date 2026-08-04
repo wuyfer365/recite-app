@@ -107,6 +107,7 @@ body { padding-bottom: 3.5rem; }
         <select id="sourceFilter" style="flex:1;margin-bottom:0;font-size:0.8rem;height:44px;" onchange="onSourceChange()">
             <option value="">全部</option>
         </select>
+        <button onclick="deleteCurrentSource()" style="padding:0.2rem 0.5rem;font-size:0.7rem;height:42px;color:#dc2626;background:#fee2e2;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;flex-shrink:0;">🗑 删</button>
     </div>
 </div>
 <div class="stats-grid">
@@ -310,6 +311,24 @@ function onSourceChange() {
     // 刷新当前页面
     var active = document.querySelector('.page.active');
     if (active) showPage(active.id);
+}
+
+async function deleteCurrentSource() {
+    var src = state.currentSource;
+    if (!src) return showModal('请先在「词库」下拉选一个要删除的词库');
+    var name = SOURCE_LABELS[src] || src;
+    showConfirm('确定删除词库「' + name + '」？该词库所有单词和学习进度将删除，不可恢复！', async function(){
+        var r = await api('DELETE', '/words/source/' + encodeURIComponent(src));
+        // 清空本地缓存，重置到全部
+        state.currentSource = '';
+        document.getElementById('sourceFilter').value = '';
+        localStorage.setItem('recite_source', '');
+        try { localStorage.removeItem('recite_words_cache'); } catch(e){}
+        state._forceNextFetch = true;
+        showModal('已删除词库「' + name + '」');
+        showPage('pageHome');
+        refreshStats();
+    });
 }
 
 function checkDate() {

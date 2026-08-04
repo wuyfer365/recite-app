@@ -352,7 +352,7 @@ async function deleteSelectedSource() {
             localStorage.setItem('recite_source', '');
         }
         try { localStorage.removeItem('recite_words_cache'); } catch(e){}
-        state._forceNextFetch = true;
+        await loadWords(true);   // 强制拉服务器最新数据，等返回后再刷新
         showModal('已删除词库「' + name + '」');
         refreshStats();
         fillDelSource();

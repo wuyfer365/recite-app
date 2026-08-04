@@ -12,7 +12,22 @@ def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(str(DB))
         g.db.row_factory = sqlite3.Row
-        g.db.execute('CREATE TABLE IF NOT EXISTS users (phone TEXT PRIMARY KEY, pw TEXT, is_admin INTEGER DEFAULT 0, curve TEXT)')
+        g.db.execute('''CREATE TABLE IF NOT EXISTS users (
+            phone TEXT PRIMARY KEY, pw TEXT, is_admin INTEGER DEFAULT 0, curve TEXT,
+            daily_limit INTEGER DEFAULT 100, mode TEXT DEFAULT 'mix', review_deduct INTEGER DEFAULT 0,
+            today_date TEXT DEFAULT '', today_studied INTEGER DEFAULT 0, today_reviewed INTEGER DEFAULT 0)''')
+        # 老库迁移：补缺失列
+        cols = {r[1] for r in g.db.execute('PRAGMA table_info(users)')}
+        for col, ddl in [
+            ('daily_limit', 'ALTER TABLE users ADD COLUMN daily_limit INTEGER DEFAULT 100'),
+            ('mode', "ALTER TABLE users ADD COLUMN mode TEXT DEFAULT 'mix'"),
+            ('review_deduct', 'ALTER TABLE users ADD COLUMN review_deduct INTEGER DEFAULT 0'),
+            ('today_date', "ALTER TABLE users ADD COLUMN today_date TEXT DEFAULT ''"),
+            ('today_studied', 'ALTER TABLE users ADD COLUMN today_studied INTEGER DEFAULT 0'),
+            ('today_reviewed', 'ALTER TABLE users ADD COLUMN today_reviewed INTEGER DEFAULT 0'),
+        ]:
+            if col not in cols:
+                g.db.execute(ddl)
         g.db.execute('''CREATE TABLE IF NOT EXISTS words (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             phone TEXT, word TEXT, meaning TEXT, phonetic TEXT,
@@ -74,13 +89,30 @@ def login():
 
 @app.route('/api/me', methods=['GET'])
 def get_me():
-    """当前用户信息"""
+    """当前用户信息（含每日设置与今日进度）"""
     phone = request.headers.get('X-Phone','')
     if not phone: return jsonify({'ok':False,'msg':'未登录'})
     db = get_db()
-    row = db.execute('SELECT phone, is_admin FROM users WHERE phone=?', (phone,)).fetchone()
+    row = db.execute('SELECT phone, is_admin, daily_limit, mode, review_deduct, today_date, today_studied, today_reviewed FROM users WHERE phone=?', (phone,)).fetchone()
     if not row: return jsonify({'ok':False,'msg':'用户不存在'})
-    return jsonify({'ok':True, 'phone': row['phone'], 'is_admin': bool(row['is_admin'])})
+    return jsonify({'ok':True, 'phone': row['phone'], 'is_admin': bool(row['is_admin']),
+        'daily_limit': row['daily_limit'] or 100, 'mode': row['mode'] or 'mix',
+        'review_deduct': bool(row['review_deduct']), 'today_date': row['today_date'] or '',
+        'today_studied': row['today_studied'] or 0, 'today_reviewed': row['today_reviewed'] or 0})
+
+@app.route('/api/settings', methods=['PUT'])
+def save_settings():
+    """保存每日设置与今日进度（账号绑定）"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    data = request.json or {}
+    db = get_db()
+    db.execute('''UPDATE users SET daily_limit=?, mode=?, review_deduct=?, today_date=?, today_studied=?, today_reviewed=? WHERE phone=?''',
+        (int(data.get('daily_limit',100) or 100), data.get('mode','mix') or 'mix',
+         1 if data.get('review_deduct') else 0,
+         data.get('today_date','') or '', int(data.get('today_studied',0) or 0), int(data.get('today_reviewed',0) or 0), phone))
+    db.commit()
+    return jsonify({'ok':True})
 
 @app.route('/api/words', methods=['GET','POST','PUT'])
 def words():

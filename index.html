@@ -225,7 +225,21 @@ function calcNextTime(stage, result) {
 // ============ 状态 ============
 let state = {mode:'mix', dailyLimit:100, words:[], todayDate:'', todayStudied:0, todayReviewed:0, _wordsLoaded:false, currentSource:'', reviewDeduct:false, _forceNextFetch:false};
 
-function loadState() {
+async function loadState() {
+    // 优先从服务器读（账号绑定：换设备/换地址/清缓存不丢）
+    try {
+        var r = await api('GET', '/me');
+        if (r.ok) {
+            state.dailyLimit = r.daily_limit || 100;
+            state.mode = r.mode || 'mix';
+            state.reviewDeduct = !!r.review_deduct;
+            state.todayDate = r.today_date || '';
+            state.todayStudied = r.today_studied || 0;
+            state.todayReviewed = r.today_reviewed || 0;
+            return;
+        }
+    } catch(e) {}
+    // 兜底：本地缓存（旧版本/离线）
     try {
         const s = JSON.parse(localStorage.getItem('recite_state'));
         if (s) { state.todayDate=s.todayDate||''; state.todayStudied=s.todayStudied||0;
@@ -235,11 +249,17 @@ function loadState() {
 }
 
 function saveState() {
-    localStorage.setItem('recite_state', JSON.stringify({
-        todayDate:state.todayDate, todayStudied:state.todayStudied,
+    var data = {todayDate:state.todayDate, todayStudied:state.todayStudied,
         todayReviewed:state.todayReviewed, dailyLimit:state.dailyLimit, mode:state.mode,
-        reviewDeduct:state.reviewDeduct
-    }));
+        reviewDeduct:state.reviewDeduct};
+    try { localStorage.setItem('recite_state', JSON.stringify(data)); } catch(e){}
+    // 同步到服务器（账号绑定）
+    try {
+        api('PUT', '/settings', {
+            daily_limit: state.dailyLimit, mode: state.mode, review_deduct: state.reviewDeduct,
+            today_date: state.todayDate, today_studied: state.todayStudied, today_reviewed: state.todayReviewed
+        }).catch(function(){});
+    } catch(e){}
 }
 
 // 按来源过滤单词
@@ -1478,7 +1498,7 @@ if (phone) {
     document.getElementById('loginPage').style.display='none';
     document.getElementById('mainApp').style.display='block';
     document.getElementById('userPhone').textContent = phone;
-    loadState();
+    loadState().then(function(){ refreshStats(); });
     // 恢复词库筛选
     var savedSource = localStorage.getItem('recite_source') || '';
     state.currentSource = savedSource;
@@ -1509,7 +1529,6 @@ if (phone) {
         try { localStorage.removeItem('recite_state'); } catch(e){}
         history.replaceState(null, '', '/');
     }
-    refreshStats();
     // URL参数 ?test=1 自动跑自测
     if (window.location.search.indexOf('test=1') !== -1) {
         setTimeout(function(){ window.__test.run(); }, 1000);
@@ -1534,7 +1553,7 @@ if (phone) {
                     document.getElementById('loginPage').style.display='none';
                     document.getElementById('mainApp').style.display='block';
                     document.getElementById('userPhone').textContent = testPhone;
-                    loadState();
+                    await loadState();
                     if (localStorage.getItem('is_admin') === '1') document.getElementById('bnavAdmin').style.display='inline';
                     setTimeout(function(){ window.__test.run(); }, 1000);
                 }

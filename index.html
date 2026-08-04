@@ -107,7 +107,6 @@ body { padding-bottom: 3.5rem; }
         <select id="sourceFilter" style="flex:1;margin-bottom:0;font-size:0.8rem;height:44px;" onchange="onSourceChange()">
             <option value="">全部</option>
         </select>
-        <button onclick="deleteCurrentSource()" style="padding:0.2rem 0.5rem;font-size:0.7rem;height:42px;color:#dc2626;background:#fee2e2;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;flex-shrink:0;">🗑 删</button>
     </div>
 </div>
 <div class="stats-grid">
@@ -122,7 +121,14 @@ body { padding-bottom: 3.5rem; }
 <div class="page" id="pageStats"><div id="statsContent"></div></div>
 <div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button><button onclick="resetCurve()" class="outline" style="margin-left:0.5rem;">恢复默认</button><p style="margin-top:0.8rem;text-align:center;"><a href="javascript:showPage('pageRules')" style="font-size:0.8rem;color:#0066cc;">📖 遗忘曲线规则详解</a></p></div>
 <div class="page" id="pageRules"><h3>📖 遗忘曲线规则</h3><div id="rulesContent"></div></div>
-<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">每行一个单词，格式：英文，中文释义（音标、例句可选），清空后粘贴你自己的词库</p><div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;"><span style="font-size:0.85rem;color:#888;">词库标签</span><select id="importSource" style="display:inline;width:auto;margin-bottom:0;font-size:0.85rem;"><option value="import">自定义</option><option value="cet4">CET-4</option><option value="grade_mj3a">闽教三上</option><option value="grade_mj3b">闽教三下</option></select></div><textarea id="importText" rows="6" placeholder="apple, 苹果, /ˈæp.əl/&#10;book, 书本, /bʊk/&#10;cat, 猫, /kæt/, The cat is sleeping., 猫在睡觉。"></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;"><button onclick="loadGrade('mj3a','闽教三年级上册')" class="outline">🟢 闽教三上</button><button onclick="loadGrade('mj3b','闽教三年级下册')" class="outline">🟢 闽教三下</button></div><button onclick="exportWords()" class="outline" style="margin-top:0.5rem;">📤 导出备份</button></div>
+<div class="page" id="pageImport"><h3>导入词库</h3><p style="font-size:0.85rem;color:#666;">每行一个单词，格式：英文，中文释义（音标、例句可选），清空后粘贴你自己的词库</p><div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;"><span style="font-size:0.85rem;color:#888;">词库标签</span><select id="importSource" style="display:inline;width:auto;margin-bottom:0;font-size:0.85rem;"><option value="import">自定义</option><option value="cet4">CET-4</option><option value="grade_mj3a">闽教三上</option><option value="grade_mj3b">闽教三下</option></select></div><textarea id="importText" rows="6" placeholder="apple, 苹果, /ˈæp.əl/&#10;book, 书本, /bʊk/&#10;cat, 猫, /kæt/, The cat is sleeping., 猫在睡觉。"></textarea><button onclick="importWords()">导入</button><hr><button onclick="loadCET4()" class="outline">📚 CET-4 完整词库</button><div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;"><button onclick="loadGrade('mj3a','闽教三年级上册')" class="outline">🟢 闽教三上</button><button onclick="loadGrade('mj3b','闽教三年级下册')" class="outline">🟢 闽教三下</button></div><button onclick="exportWords()" class="outline" style="margin-top:0.5rem;">📤 导出备份</button>
+<hr>
+<div style="font-size:0.85rem;font-weight:600;color:#dc2626;margin-top:0.4rem;">🗑 删除词库（含学习数据，不可恢复）</div>
+<div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.3rem;">
+    <select id="delSource" style="flex:1;font-size:0.85rem;margin-bottom:0;"><option value="">选择要删除的词库</option></select>
+    <button onclick="deleteSelectedSource()" style="padding:0.3rem 0.8rem;font-size:0.8rem;color:#dc2626;background:#fee2e2;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">🗑 删除</button>
+</div>
+<p style="font-size:0.75rem;color:#999;margin-top:0.3rem;">删除后可在上方重新导入这个词库，学习进度从零开始</p></div>
 <div class="page" id="pageRank"><h3>🏆 排行榜</h3><div id="rankContent"></div></div>
 <div class="page" id="pageAdmin"><h3>👑 管理面板</h3><div id="adminContent"></div></div>
 <!-- 底部导航（全局固定，不在任何.page内部） -->
@@ -313,21 +319,42 @@ function onSourceChange() {
     if (active) showPage(active.id);
 }
 
-async function deleteCurrentSource() {
-    var src = state.currentSource;
-    if (!src) return showModal('请先在「词库」下拉选一个要删除的词库');
+function fillDelSource() {
+    var sel = document.getElementById('delSource');
+    if (!sel) return;
+    var sources = {};
+    for (var i=0;i<state.words.length;i++) {
+        var src = state.words[i].source;
+        if (src) sources[src] = (sources[src]||0)+1;
+    }
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">选择要删除的词库</option>';
+    Object.keys(sources).sort().forEach(function(k){
+        var opt = document.createElement('option');
+        opt.value = k;
+        opt.textContent = (SOURCE_LABELS[k]||k) + '（' + sources[k] + '词）';
+        sel.appendChild(opt);
+    });
+    if (cur && sources[cur]) sel.value = cur;
+}
+
+async function deleteSelectedSource() {
+    var src = document.getElementById('delSource').value;
+    if (!src) return showModal('请先选择要删除的词库');
     var name = SOURCE_LABELS[src] || src;
     showConfirm('确定删除词库「' + name + '」？该词库所有单词和学习进度将删除，不可恢复！', async function(){
-        var r = await api('DELETE', '/words/source/' + encodeURIComponent(src));
-        // 清空本地缓存，重置到全部
-        state.currentSource = '';
-        document.getElementById('sourceFilter').value = '';
-        localStorage.setItem('recite_source', '');
+        await api('DELETE', '/words/source/' + encodeURIComponent(src));
+        // 若删的是当前选中词库，重置
+        if (state.currentSource === src) {
+            state.currentSource = '';
+            document.getElementById('sourceFilter').value = '';
+            localStorage.setItem('recite_source', '');
+        }
         try { localStorage.removeItem('recite_words_cache'); } catch(e){}
         state._forceNextFetch = true;
         showModal('已删除词库「' + name + '」');
-        showPage('pageHome');
         refreshStats();
+        fillDelSource();
     });
 }
 
@@ -419,6 +446,7 @@ function showPage(id) {
     if (id==='pageAdmin') { renderAdmin(); }
     if (id==='pageRules') renderRules();
     if (id==='pageCurve') { _curveLoaded=false; renderCurveSettings(); }
+    if (id==='pageImport') { loadWords().then(function(){ fillDelSource(); }); }
 }
 
 // 更新统计数字（不刷新页面）

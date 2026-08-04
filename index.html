@@ -277,7 +277,7 @@ var SOURCE_LABELS = {
 // 根据 state.words 动态更新词库筛选器（只显示用户已导入的词库）
 function updateSourceFilter() {
     var sel = document.getElementById('sourceFilter');
-    var currentVal = sel.value;
+    var currentVal = state.currentSource || sel.value;
     // 收集用户已有的词库
     var sources = {};
     var noSource = 0;

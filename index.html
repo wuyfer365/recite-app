@@ -1554,5 +1554,11 @@ if (phone) {
         </div>
     </div>
 </div>
+<script>
+// 注册 Service Worker（仅 HTTPS 生效；HTTP 下自动忽略）
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function(e){console.log('SW注册失败', e);});
+}
+</script>
 </body>
 </html>

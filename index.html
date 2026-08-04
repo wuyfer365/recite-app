@@ -345,17 +345,19 @@ async function deleteSelectedSource() {
     var name = SOURCE_LABELS[src] || src;
     showConfirm('确定删除词库「' + name + '」？该词库所有单词和学习进度将删除，不可恢复！', async function(){
         await api('DELETE', '/words/source/' + encodeURIComponent(src));
-        // 若删的是当前选中词库，重置
+        // 本地立即移除该词库的词（下拉/统计即时更新，不等服务器）
+        state.words = state.words.filter(function(w){ return w.source !== src; });
         if (state.currentSource === src) {
             state.currentSource = '';
             document.getElementById('sourceFilter').value = '';
             localStorage.setItem('recite_source', '');
         }
         try { localStorage.removeItem('recite_words_cache'); } catch(e){}
-        await loadWords(true);   // 强制拉服务器最新数据，等返回后再刷新
         showModal('已删除词库「' + name + '」');
-        refreshStats();
         fillDelSource();
+        refreshStats();
+        // 后台静默拉服务器对齐（不阻塞界面，失败不影响）
+        loadWords(true).catch(function(){});
     });
 }
 

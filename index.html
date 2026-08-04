@@ -339,25 +339,33 @@ function fillDelSource() {
     if (cur && sources[cur]) sel.value = cur;
 }
 
+function showBusy(text){ var m=document.getElementById('busyMask'); if(!m) return; m.style.display='flex'; document.getElementById('busyText').textContent=text; }
+function hideBusy(){ var m=document.getElementById('busyMask'); if(m) m.style.display='none'; }
+
 async function deleteSelectedSource() {
     var src = document.getElementById('delSource').value;
     if (!src) return showModal('请先选择要删除的词库');
     var name = SOURCE_LABELS[src] || src;
     showConfirm('确定删除词库「' + name + '」？该词库所有单词和学习进度将删除，不可恢复！', async function(){
-        await api('DELETE', '/words/source/' + encodeURIComponent(src));
-        // 本地立即移除该词库的词（下拉/统计即时更新，不等服务器）
-        state.words = state.words.filter(function(w){ return w.source !== src; });
-        if (state.currentSource === src) {
-            state.currentSource = '';
-            document.getElementById('sourceFilter').value = '';
-            localStorage.setItem('recite_source', '');
+        showBusy('删除词库中...');
+        try {
+            await api('DELETE', '/words/source/' + encodeURIComponent(src));
+            state.words = state.words.filter(function(w){ return w.source !== src; });
+            if (state.currentSource === src) {
+                state.currentSource = '';
+                document.getElementById('sourceFilter').value = '';
+                localStorage.setItem('recite_source', '');
+            }
+            try { localStorage.removeItem('recite_words_cache'); } catch(e){}
+            await loadWords(true);
+            hideBusy();
+            showModal('已删除词库「' + name + '」');
+            fillDelSource();
+            refreshStats();
+        } catch(e) {
+            hideBusy();
+            showModal('删除失败: ' + (e.message||'网络错误'));
         }
-        try { localStorage.removeItem('recite_words_cache'); } catch(e){}
-        showModal('已删除词库「' + name + '」');
-        fillDelSource();
-        refreshStats();
-        // 后台静默拉服务器对齐（不阻塞界面，失败不影响）
-        loadWords(true).catch(function(){});
     });
 }
 
@@ -961,10 +969,17 @@ async function importWords() {
         list.push({word:p[0], meaning:p[1]||'', phonetic:p[2]||'', example:p[3]||'', example_cn:p[4]||'', status:'new', source: src});
     }
     if (list.length===0) return showModal('未解析到有效单词');
-    const r = await saveWords(list);
-    showModal(`导入 ${list.length} 个单词`);
-    await loadWords(true);
-    switchSource(src);
+    showBusy('导入中...');
+    try {
+        const r = await saveWords(list);
+        await loadWords(true);
+        hideBusy();
+        showModal(`导入 ${list.length} 个单词`);
+        switchSource(src);
+    } catch(e) {
+        hideBusy();
+        showModal('导入失败: ' + (e.message||'网络错误'));
+    }
 }
 
 async function exportWords() {
@@ -1028,6 +1043,7 @@ async function loadPrimary() {
 
 // ============ 年级词库加载 ============
 async function loadGrade(shortName, displayName) {
+    showBusy('加载' + displayName + '词库中...');
     try {
         const resp = await fetch('grade_' + shortName + '.csv');
         const text = await resp.text();
@@ -1050,8 +1066,10 @@ async function loadGrade(shortName, displayName) {
         showModal('加载 ' + list2.length + ' 个' + displayName + '单词');
         updateSourceFilter();
         await loadWords(true);
+        hideBusy();
+        showModal('加载 ' + list2.length + ' 个' + displayName + '单词');
         switchSource(source);
-    } catch(e) { showModal('加载失败: '+e.message); }
+    } catch(e) { hideBusy(); showModal('加载失败: '+e.message); }
 }
 
 // 用简单的 CSV 行解析（处理带逗号的问题）
@@ -1626,5 +1644,9 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function(e){console.log('SW注册失败', e);});
 }
 </script>
+<div id="busyMask" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.78);z-index:999;align-items:center;justify-content:center;flex-direction:column;">
+    <div class="loading-spinner active"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <p id="busyText" style="color:#666;margin-top:0.8rem;font-size:0.9rem;"></p>
+</div>
 </body>
 </html>

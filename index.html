@@ -7,6 +7,11 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>单词记忆</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0066cc">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon_192.png">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
 <style>
@@ -258,10 +263,13 @@ function updateSourceFilter() {
     var currentVal = sel.value;
     // 收集用户已有的词库
     var sources = {};
+    var noSource = 0;
     for (var i=0;i<state.words.length;i++) {
         var src = state.words[i].source;
-        if (src) sources[src] = (sources[src]||0) + 1;
+        if (src) { sources[src] = (sources[src]||0) + 1; }
+        else { noSource++; }
     }
+    if (noSource > 0) { sources[''] = noSource; }
     // 重建选项（保留「全部」）
     sel.innerHTML = '<option value="">全部</option>';
     var keys = Object.keys(sources).sort();
@@ -307,34 +315,22 @@ async function loadWords(force) {
     }
     state._forceNextFetch = false;
     if (!reallyForce && state._wordsLoaded) { console.log('[DBG] loadWords: early return'); return; }
-    // 从 localStorage 缓存秒开（仅首次加载无force时）
-    if (!reallyForce && state.words.length===0) {
-        try {
-            var cached = JSON.parse(localStorage.getItem('recite_words_cache'));
-            if (cached && cached.words && Array.isArray(cached.words)) {
-                state.words = cached.words;
-                state._wordsLoaded = true;
-                // 界面已渲染，后台静默拉新
-                getAllWords().then(function(fresh){
-                    if (fresh && fresh.length > 0) {
-                        state.words = fresh;
-                        updateSourceFilter();
-                        try { localStorage.setItem('recite_words_cache', JSON.stringify({words:fresh, time:Date.now()})); } catch(e){}
-                        if (document.getElementById('pageHome').classList.contains('active')) updateStats();
-                    }
-                });
-                return;
-            }
-        } catch(e){}
-    }
-    // 无缓存或强制刷新，走网络
+    // 网络加载（正常路径）；失败/空时用缓存兜底，避免空白
     var fresh = await getAllWords();
     console.log('[DBG] loadWords: got ' + (fresh ? fresh.length : 0) + ' words from server');
     if (fresh && fresh.length > 0 || !state._wordsLoaded) {
-        state.words = fresh;
+        if (fresh && fresh.length > 0) {
+            state.words = fresh;
+            try { localStorage.setItem('recite_words_cache', JSON.stringify({words:fresh, time:Date.now()})); } catch(e){}
+        } else {
+            // 网络失败/无数据：用缓存兜底
+            try {
+                var cached = JSON.parse(localStorage.getItem('recite_words_cache'));
+                if (cached && cached.words && Array.isArray(cached.words)) state.words = cached.words;
+            } catch(e){}
+        }
         state._wordsLoaded = true;
         updateSourceFilter();
-        try { localStorage.setItem('recite_words_cache', JSON.stringify({words:fresh, time:Date.now()})); } catch(e){}
     }
     console.log('[DBG] loadWords: done, state.words=' + state.words.length);
 }
@@ -380,11 +376,11 @@ function showPage(id) {
     document.querySelectorAll('.bnav').forEach(b => b.classList.remove('active'));
     var btn = document.getElementById('bnav' + id.substring(4));
     if (btn) btn.classList.add('active');
-    if (id==='pageWords') { state._forceNextFetch = true; renderWordList(); }
-    if (id==='pageStats') { state._forceNextFetch = true; renderStatsPage(); }
-    if (id==='pageHome') { state._forceNextFetch = true; refreshStats(); }
+    if (id==='pageWords') { renderWordList(); }
+    if (id==='pageStats') { renderStatsPage(); }
+    if (id==='pageHome') { refreshStats(); }
     if (id==='pageRank') renderRank();
-    if (id==='pageAdmin') { state._forceNextFetch = true; renderAdmin(); }
+    if (id==='pageAdmin') { renderAdmin(); }
     if (id==='pageRules') renderRules();
     if (id==='pageCurve') { _curveLoaded=false; renderCurveSettings(); }
 }
@@ -877,8 +873,6 @@ async function switchSource(src) {
     state.currentSource = src;
     document.getElementById('sourceFilter').value = src;
     localStorage.setItem('recite_source', src);
-    state._wordsLoaded = false;
-    state._forceNextFetch = true;
     // 切换词库时重置今日计数，避免旧词库的复习量影响新词库
     state.todayStudied = 0;
     state.todayReviewed = 0;

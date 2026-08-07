@@ -805,7 +805,7 @@ async function loadHardWords() {
     var cont = document.getElementById('hardContent');
     cont.innerHTML = '<p style="color:#888;">加载中...</p>';
     try {
-        var data = await api('GET', '/api/words/hard');
+        var data = await api('GET', '/words/hard');
         if (!data.ok) { cont.innerHTML = '<p style="color:red;">' + data.msg + '</p>'; return; }
         var ws = data.words || [];
         if (!ws.length) {
@@ -831,7 +831,7 @@ async function genStory() {
     box.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#999;">⏳ 正在用难词编故事，约30秒...</div>';
     box.scrollIntoView({behavior:'smooth'});
     try {
-        var data = await api('POST', '/api/story');
+        var data = await api('POST', '/story');
         if (!data.ok) { box.innerHTML = '<div style="text-align:center;padding:1rem;color:#e74c3c;">' + data.msg + '</div>'; return; }
         var s = data.story || '';
         var esc = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

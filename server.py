@@ -34,8 +34,13 @@ def get_db():
             example TEXT, example_cn TEXT, stage INTEGER DEFAULT 0,
             next_time REAL, last_time REAL, status TEXT DEFAULT 'new',
             fail_count INTEGER DEFAULT 0,
+            hard_count INTEGER DEFAULT 0,
             source TEXT DEFAULT 'import',
             UNIQUE(phone, word))''')
+        # 迁移：words 补 hard_count（点模糊/忘记都累计的难词次数）
+        wcols = {r[1] for r in g.db.execute('PRAGMA table_info(words)')}
+        if 'hard_count' not in wcols:
+            g.db.execute('ALTER TABLE words ADD COLUMN hard_count INTEGER DEFAULT 0')
         g.db.commit()
     return g.db
 
@@ -142,10 +147,75 @@ def words():
 
     if request.method == 'PUT':
         w = request.json
-        db.execute('''UPDATE words SET stage=?, next_time=?, last_time=?, status=?, fail_count=? WHERE phone=? AND word=?''',
-            (w['stage'], w.get('next_time'), w.get('last_time'), w['status'], w.get('fail_count',0), phone, w['word']))
+        db.execute('''UPDATE words SET stage=?, next_time=?, last_time=?, status=?, fail_count=?, hard_count=? WHERE phone=? AND word=?''',
+            (w['stage'], w.get('next_time'), w.get('last_time'), w['status'],
+             w.get('fail_count',0), w.get('hard_count',0), phone, w['word']))
         db.commit()
         return jsonify({'ok':True})
+
+@app.route('/api/words/hard', methods=['GET'])
+def hard_words():
+    """难词列表：点过模糊/忘记的单词，按难词次数排序"""
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    db = get_db()
+    # 难词阈值：点满 5 次模糊/记不住自动进难词本
+    rows = db.execute('''SELECT word, meaning, hard_count, fail_count, stage FROM words
+        WHERE phone=? AND hard_count >= 5
+        ORDER BY hard_count DESC, word LIMIT 50''', (phone,)).fetchall()
+    return jsonify({'ok':True, 'words': [dict(r) for r in rows]})
+
+@app.route('/api/story', methods=['POST'])
+def gen_story():
+    """用难词生成新概念二风格双语小故事"""
+    import urllib.request
+    phone = request.headers.get('X-Phone','')
+    if not phone: return jsonify({'ok':False,'msg':'未登录'})
+    data = request.json or {}
+    words = data.get('words') or []
+    if not words:
+        db = get_db()
+        rows = db.execute('''SELECT word, meaning FROM words
+            WHERE phone=? AND hard_count >= 5
+            ORDER BY hard_count DESC, word LIMIT 20''', (phone,)).fetchall()
+        words = [dict(r) for r in rows]
+    if not words:
+        return jsonify({'ok':False,'msg':'还没有难词，同一个单词点满5次「模糊」或「忘记」会自动收集'})
+    wordlist = '\n'.join(f'- {w["word"]}: {w.get("meaning","")}' for w in words)
+    prompt = (f'''请用下面这些英语单词写一篇类似《新概念英语第二册》的英语小故事（8-15句话，日常情景，语言简单地道），
+尽量自然地把这些词都用上。然后给出全文中文翻译。
+输出格式（严格）：
+【英语原文】
+（英语故事）
+【中文翻译】
+（中文翻译）
+【单词注释】
+（每个难词的音标+中文，一行一个）
+
+需要使用的单词：
+{wordlist}''')
+    payload = json.dumps({
+        'model': 'deepseek-chat',
+        'messages': [
+            {'role': 'system', 'content': '你是新概念英语风格的英语故事作者，擅长用指定单词写简洁地道的双语小故事。'},
+            {'role': 'user', 'content': prompt},
+        ],
+        'stream': False,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        'https://api.deepseek.com/chat/completions',
+        data=payload,
+        headers={
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer sk-5a07e5fd73644403b044fe60b19d1006',
+        })
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+        reply = result['choices'][0]['message']['content'].strip()
+        return jsonify({'ok': True, 'story': reply})
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': f'故事生成失败: {e}'})
 
 @app.route('/api/words/clear', methods=['DELETE'])
 def clear_words():

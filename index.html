@@ -118,6 +118,7 @@ body { padding-bottom: 3.5rem; }
 <div class="page active" id="pageHome"><div class="loading-spinner" id="loadingSpinner"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><div id="homeContent"></div>
 </div>
 <div class="page" id="pageWords"><div id="wordList"></div></div>
+<div class="page" id="pageHard"><h3>📚 我的难词</h3><p style="font-size:0.85rem;color:#666;">同一个单词点满 5 次「模糊」或「忘记」自动进难词本，可一键编成双语小故事强化记忆。</p><div id="hardContent"></div></div>
 <div class="page" id="pageStats"><div id="statsContent"></div></div>
 <div class="page" id="pageCurve"><h3>遗忘曲线设置</h3><p style="font-size:0.85rem;color:#666;">通过后升阶，模糊则降阶减半，遗忘归零。可自定义各阶段间隔。</p><div id="curveSettings"></div><button onclick="saveCurve();return false;">保存设置</button><button onclick="resetCurve()" class="outline" style="margin-left:0.5rem;">恢复默认</button><p style="margin-top:0.8rem;text-align:center;"><a href="javascript:showPage('pageRules')" style="font-size:0.8rem;color:#0066cc;">📖 遗忘曲线规则详解</a></p></div>
 <div class="page" id="pageRules"><h3>📖 遗忘曲线规则</h3><div id="rulesContent"></div></div>
@@ -135,6 +136,7 @@ body { padding-bottom: 3.5rem; }
 <div class="bottom-nav">
     <button onclick="showPage('pageHome')" class="bnav" id="bnavHome">首页</button>
     <button onclick="showPage('pageWords')" class="bnav" id="bnavWords">词库</button>
+    <button onclick="showPage('pageHard')" class="bnav" id="bnavHard">难词</button>
     <button onclick="showPage('pageStats')" class="bnav" id="bnavStats">统计</button>
     <button onclick="showPage('pageRank')" class="bnav" id="bnavRank">排行</button>
     <button onclick="showPage('pageCurve')" class="bnav" id="bnavCurve">曲线</button>
@@ -451,6 +453,7 @@ function showPage(id) {
     var btn = document.getElementById('bnav' + id.substring(4));
     if (btn) btn.classList.add('active');
     if (id==='pageWords') { renderWordList(); }
+    if (id==='pageHard') { loadHardWords(); }
     if (id==='pageStats') { renderStatsPage(); }
     if (id==='pageHome') { refreshStats(); }
     if (id==='pageRank') renderRank();
@@ -563,8 +566,8 @@ async function nextCard() {
 async function rateWord(result) {
     const w = currentWords[currentIndex];
     w.last_time=Date.now();
-    if (result==='forgot') { w.fail_count=(w.fail_count||0)+1; const r=calcNextTime(w.stage||0,'forgot'); w.stage=r.stage; w.next_time=r.nextTime; }
-    else if (result==='blur') { const r=calcNextTime(w.stage||0,'blur'); w.stage=r.stage; w.next_time=r.nextTime; }
+    if (result==='forgot') { w.fail_count=(w.fail_count||0)+1; w.hard_count=(w.hard_count||0)+1; const r=calcNextTime(w.stage||0,'forgot'); w.stage=r.stage; w.next_time=r.nextTime; }
+    else if (result==='blur') { w.hard_count=(w.hard_count||0)+1; const r=calcNextTime(w.stage||0,'blur'); w.stage=r.stage; w.next_time=r.nextTime; }
     else { const r=calcNextTime(w.stage||0,'got'); w.stage=r.stage; w.next_time=r.nextTime; if(r.mastered) w.status='mastered'; }
     await saveWord(w);
     state.todayReviewed++; saveState();
@@ -795,6 +798,45 @@ async function renderRank() {
         html += '</div>';
         document.getElementById('rankContent').innerHTML = html;
     } catch(e) { document.getElementById('rankContent').innerHTML = '<p style="color:red;">加载失败: ' + e.message + '</p>'; }
+}
+
+// ============ 难词 + 双语故事 ============
+async function loadHardWords() {
+    var cont = document.getElementById('hardContent');
+    cont.innerHTML = '<p style="color:#888;">加载中...</p>';
+    try {
+        var data = await api('GET', '/api/words/hard');
+        if (!data.ok) { cont.innerHTML = '<p style="color:red;">' + data.msg + '</p>'; return; }
+        var ws = data.words || [];
+        if (!ws.length) {
+            cont.innerHTML = '<div style="text-align:center;padding:2rem 0;color:#999;">还没有难词<br><span style="font-size:0.8rem;">同一个单词点满 5 次「🔄 模糊」或「❌ 忘记」自动进难词本</span></div>';
+            return;
+        }
+        var html = '<div style="font-size:0.82rem;color:#666;margin-bottom:0.5rem;">共 ' + ws.length + ' 个难词（按记不住次数排序）</div>';
+        ws.forEach(function(w) {
+            var n = (w.hard_count||0)*2 + (w.fail_count||0);
+            html += '<div style="background:#fff8e1;border-radius:8px;padding:0.5rem 0.7rem;margin-bottom:0.35rem;border-left:3px solid #f39c12;">';
+            html += '<b>' + w.word + '</b> <span style="color:#f39c12;font-size:0.68rem;background:#fdecc8;padding:0.05rem 0.35rem;border-radius:4px;margin-left:0.3rem;">难词×' + n + '</span>';
+            html += '<div style="font-size:0.82rem;color:#666;margin-top:0.15rem;">' + (w.meaning||'') + '</div>';
+            html += '</div>';
+        });
+        html += '<button onclick="genStory()" style="margin-top:0.8rem;width:100%;padding:0.8rem;background:#0066cc;color:#fff;border:none;border-radius:10px;font-size:0.95rem;cursor:pointer;">📖 用这些难词生成双语小故事</button>';
+        html += '<div id="storyBox"></div>';
+        cont.innerHTML = html;
+    } catch(e) { cont.innerHTML = '<p style="color:red;">加载失败: ' + e.message + '</p>'; }
+}
+
+async function genStory() {
+    var box = document.getElementById('storyBox');
+    box.innerHTML = '<div style="text-align:center;padding:1.5rem;color:#999;">⏳ 正在用难词编故事，约30秒...</div>';
+    box.scrollIntoView({behavior:'smooth'});
+    try {
+        var data = await api('POST', '/api/story');
+        if (!data.ok) { box.innerHTML = '<div style="text-align:center;padding:1rem;color:#e74c3c;">' + data.msg + '</div>'; return; }
+        var s = data.story || '';
+        var esc = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        box.innerHTML = '<div style="margin-top:0.8rem;background:#fff;border:1px solid #eaecef;border-radius:10px;padding:1rem;white-space:pre-wrap;line-height:1.8;font-size:0.9rem;">' + esc + '</div>';
+    } catch(e) { box.innerHTML = '<div style="text-align:center;padding:1rem;color:#e74c3c;">生成失败: ' + e.message + '</div>'; }
 }
 
 function changeMyPassword() {
